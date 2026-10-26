@@ -1,0 +1,188 @@
+// GPU grass placement for GrassGpuField. One dispatch per camera and grass type.
+// Threads walk a square grid of world-aligned cells around the camera; every cell tries _PerCell jittered candidates.
+// Candidates are deterministic (cell, index, seed) so the lawn does not swim when the camera moves. Survivors of the density,
+// distance, frustum and optional Hi-Z tests are appended as Blade records, which FoliageForgeGrass.shader reads by instance id.
+// CSArgs turns the append counter into indirect draw arguments, clamped to the buffer capacity.
+#pragma kernel CSPlace
+#pragma kernel CSArgs
+
+// Flag bits (GrassGpuMath.Flag*).
+#define FLAG_DENSITY_TEX 1u     // _DensityTex.r scales density; outside the window nothing grows
+#define FLAG_HEIGHT_SCALE 2u    // _DensityTex.g scales blade height
+#define FLAG_TYPE_FROM_B 4u     // _DensityTex.b selects the grass type (round(b * (types - 1)))
+#define FLAG_HEIGHT_TEX 8u      // ground height from _HeightTex.r instead of the flat plane
+#define FLAG_HIZ 16u            // occlusion test against _HiZ
+#define FLAG_FRUSTUM 32u
+#define FLAG_DISTANCE_THIN 64u  // same share / keep rule as the CPU path and the vertex shader
+
+struct Blade
+{
+    float3 pos;
+    float yaw;
+    float height;
+    float width;
+    float seed;
+    float type;
+};
+
+AppendStructuredBuffer<Blade> _Blades;
+Texture2D<float4> _DensityTex;
+Texture2D<float4> _HeightTex;
+Texture2D<float> _HiZ;      // min (farthest, reversed-Z) depth per tile, mip chain; bound only when FLAG_HIZ is set
+SamplerState sampler_LinearClamp;
+
+int _GridOriginX;
+int _GridOriginZ;
+uint _Side;             // cells per side
+uint _PerCell;          // candidates per cell
+uint _Total;            // side * side * perCell
+uint _DispatchWidth;    // threads in one row of the dispatch
+uint _Flags;
+uint _Seed;
+uint _Variant;
+uint _VariantCount;
+float _CellSize;
+float _Accept;          // density * cell^2 / perCell, so ceil() on the candidate count does not add density
+float4 _CamPos;         // xyz = camera, w = draw radius
+float4 _Planes[6];      // inward normals, w = offset (Unity frustum planes)
+float4 _Window;         // xy = world xz corner of the density map, zw = 1 / world size
+float4 _HeightWindow;   // same for the height map
+float4 _HeightParams;   // x = min height, y = height range (texture r = 0..1), z = flat Y when there is no height map
+float4 _SizeRange;      // x = min height, y = max height, z = min width, w = max width
+float4 _LodParams;      // x = lod near, y = lod far (metres), z = min share
+float4x4 _ViewProj;     // GPU projection * view
+float4 _HiZParams;      // x = mip count, y = width, z = height, w = depth bias
+
+RWByteAddressBuffer _Args;
+ByteAddressBuffer _Counter;
+uint _ArgIndexCount;
+uint _MaxBlades;
+
+// Same generator as FFG_Pcg in FoliageForgeGrass.hlsl (and GrassLod.Keep on the CPU).
+uint Pcg(uint v)
+{
+    uint s = v * 747796405u + 2891336453u;
+    uint w = ((s >> ((s >> 28) + 4u)) ^ s) * 277803737u;
+    return (w >> 22) ^ w;
+}
+
+float R01(uint h)
+{
+    return (float)(h & 0xFFFFFFu) / 16777216.0;
+}
+
+float2 WindowUv(float4 window, float2 xz)
+{
+    return (xz - window.xy) * window.zw;
+}
+
+bool HiZOccluded(float3 p, float radius)
+{
+    float3 toCam = _CamPos.xyz - p;
+    float3 nearP = p + toCam * (radius / max(length(toCam), 1e-3));
+    float4 clip = mul(_ViewProj, float4(nearP, 1.0));
+    if (clip.w <= 0.0) return false;
+    float3 ndc = clip.xyz / clip.w;
+    float2 uv = ndc.xy * 0.5 + 0.5;
+    if (any(uv < 0.0) || any(uv > 1.0)) return false;
+    float4 c = mul(_ViewProj, float4(p, 1.0));
+    float px = radius * 2.0 * abs(_ViewProj[1][1]) / max(c.w, 1e-3) * 0.5 * _HiZParams.z;
+    float mip = clamp(ceil(log2(max(px, 1.0))), 0.0, _HiZParams.x - 1.0);
+    uint m = (uint)mip;
+    int2 size = max(int2(_HiZParams.yz) >> m, 1);
+    float hiz = _HiZ.Load(int3(min(int2(uv * size), size - 1), m));
+    return ndc.z < hiz - _HiZParams.w;
+}
+
+[numthreads(64, 1, 1)]
+void CSPlace(uint3 tid : SV_DispatchThreadID)
+{
+    uint id = tid.y * _DispatchWidth + tid.x;
+    if (id >= _Total) return;
+
+    uint cellIndex = id / _PerCell;
+    uint k = id - cellIndex * _PerCell;
+    int gx = _GridOriginX + (int)(cellIndex % _Side);
+    int gz = _GridOriginZ + (int)(cellIndex / _Side);
+
+    uint h = Pcg((uint)gx * 73856093u ^ Pcg((uint)gz * 19349663u ^ Pcg(k * 83492791u ^ (_Seed + _Variant * 2654435761u))));
+    uint h1 = Pcg(h ^ 0x68e31da4u);
+    uint h2 = Pcg(h1 ^ 0xb5297a4du);
+    uint h3 = Pcg(h2 ^ 0x1b56c4e9u);
+    uint h4 = Pcg(h3 ^ 0x2545f491u);
+    uint h5 = Pcg(h4 ^ 0x9e3779b9u);
+    uint h6 = Pcg(h5 ^ 0x85ebca6bu);
+    uint h7 = Pcg(h6 ^ 0xc2b2ae35u);
+
+    float2 xz = (float2(gx, gz) + float2(R01(h1), R01(h2))) * _CellSize;
+
+    // cheap rejections first: radius, then density
+    float2 toCam = xz - _CamPos.xz;
+    float dist2d = length(toCam);
+    if (dist2d > _CamPos.w) return;
+
+    float density = _Accept;
+    float heightScale = 1.0;
+    if ((_Flags & FLAG_DENSITY_TEX) != 0u)
+    {
+        float2 uv = WindowUv(_Window, xz);
+        if (any(uv < 0.0) || any(uv > 1.0)) return;
+        float4 d = _DensityTex.SampleLevel(sampler_LinearClamp, uv, 0);
+        density *= d.r;
+        if ((_Flags & FLAG_HEIGHT_SCALE) != 0u) heightScale = d.g;
+        if ((_Flags & FLAG_TYPE_FROM_B) != 0u)
+        {
+            uint type = (uint)(d.b * (float)(_VariantCount - 1u) + 0.5);
+            if (type != _Variant) return;
+        }
+    }
+    if (R01(h3) >= density) return;
+
+    float y = _HeightParams.z;
+    if ((_Flags & FLAG_HEIGHT_TEX) != 0u)
+        y = _HeightParams.x + _HeightTex.SampleLevel(sampler_LinearClamp, WindowUv(_HeightWindow, xz), 0).r * _HeightParams.y;
+    float3 pos = float3(xz.x, y, xz.y);
+
+    float height = lerp(_SizeRange.x, _SizeRange.y, R01(h4)) * heightScale;
+    float width = lerp(_SizeRange.z, _SizeRange.w, R01(h5));
+
+    if ((_Flags & FLAG_DISTANCE_THIN) != 0u)
+    {
+        float d3 = distance(pos, _CamPos.xyz);
+        float share = lerp(1.0, _LodParams.z, smoothstep(_LodParams.x, max(_LodParams.y, _LodParams.x + 0.01), d3));
+        // integer hash of the position in millimetres: FFG_DisplaceN and GrassLod.Keep use the same one
+        uint hx = (uint)(int)floor(pos.x * 1000.0 + 0.5);
+        uint hz = (uint)(int)floor(pos.z * 1000.0 + 0.5);
+        float keep = R01(Pcg(hx ^ Pcg(hz)));
+        if (keep > share) return;
+    }
+
+    float radius = max(height, width) + 0.5; // wind headroom
+    float3 centre = pos + float3(0.0, height * 0.5, 0.0);
+    if ((_Flags & FLAG_FRUSTUM) != 0u)
+    {
+        [unroll] for (int i = 0; i < 6; i++)
+            if (dot(_Planes[i].xyz, centre) + _Planes[i].w < -radius) return;
+    }
+    if ((_Flags & FLAG_HIZ) != 0u && HiZOccluded(centre, radius)) return;
+
+    Blade b;
+    b.pos = pos;
+    b.yaw = R01(h6) * 6.2831853;
+    b.height = height;
+    b.width = width;
+    b.seed = R01(h7);
+    b.type = (float)_Variant;
+    _Blades.Append(b);
+}
+
+// IndirectDrawIndexedArgs: indexCount, instanceCount, startIndex, baseVertex, startInstance.
+[numthreads(1, 1, 1)]
+void CSArgs()
+{
+    _Args.Store(0, _ArgIndexCount);
+    _Args.Store(4, min(_Counter.Load(0), _MaxBlades));
+    _Args.Store(8, 0u);
+    _Args.Store(12, 0u);
+    _Args.Store(16, 0u);
+}

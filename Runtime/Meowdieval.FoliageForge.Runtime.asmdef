@@ -1,0 +1,14 @@
+{
+    "name": "Meowdieval.FoliageForge.Runtime",
+    "rootNamespace": "Meowdieval.FoliageForge",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

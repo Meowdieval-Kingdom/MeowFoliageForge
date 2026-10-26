@@ -1,0 +1,13 @@
+{
+  "name": "com.meowdieval.foliageforge",
+  "version": "0.1.0",
+  "displayName": "Foliage Forge",
+  "description": "Editor-only procedural tree generator for stylized foliage. Bakes trunk, branches and leaf cards into a mesh and prefab, with a wind and gradient Shader Graph.",
+  "unity": "6000.0",
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "17.0.0",
+    "com.unity.shadergraph": "17.0.0"
+  },
+  "keywords": ["procedural", "tree", "foliage", "stylized", "wind"],
+  "author": { "name": "Meowdieval Kingdom" }
+}
