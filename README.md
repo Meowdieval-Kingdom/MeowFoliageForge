@@ -1,91 +1,95 @@
 # Foliage Forge
 
-Editor-only procedural tree generator for stylized foliage. A recipe (seed + settings) bakes to a mesh and prefab; nothing generates at runtime.
+Procedural stylized foliage for Unity (URP). Design a tree as a **recipe** (seed + settings), bake it to a mesh and prefab, and place it with a scene brush. Add GPU-instanced grass on top. Trees are baked in the editor; nothing generates at runtime.
 
-## Use
-1. `Meowdieval > Foliage Forge`, press **New**, pick a preset.
-2. Edit settings on the left. The tree rebuilds as you edit. Drag to orbit, scroll to zoom, double-click to reset.
-3. **Bake Prefab** writes `<recipe name>/` (mesh, bark and leaf materials, prefab) into the output folder (default `Assets/Foliage Forge`; change it with **Folder...** under the preview). The **Prefabs** strip below the preview lists every baked tree; click one to open its recipe, double-click to show it in the Project.
-   The View bar above the preview holds Ortho, Ground and Wind; Direction and Strength live in their own Wind panel.
-   Presets: Oak, Dead, Maple, Spruce. The **Textured** toggle next to the Preset menu decides whether the next preset loads leaf, bark and moss textures (off by default: no textures, flat solid cards); **Swap Textures** switches the current recipe between the two without resetting anything else. In code: `ApplyPreset(preset, textured)` and `SetTextured(bool)`.
-4. Add one **Foliage Wind** component to the scene for wind. Direction is in degrees around Y.
+| Oak | Maple | Spruce | Dead |
+|---|---|---|---|
+| ![Oak](Documentation~/images/preset-oak.png) | ![Maple](Documentation~/images/preset-maple.png) | ![Spruce](Documentation~/images/preset-spruce.png) | ![Dead](Documentation~/images/preset-dead.png) |
 
-## Mesh layout
-- Submesh 0 = wood, submesh 1 = leaf cards. Two draw calls per tree.
-- Vertex colour: R height 0..1, G sway weight, B 1 on leaf cards, A per-branch random.
-- UV1 on leaf cards: xyz pivot (object space), w flutter phase.
+*The four built-in presets, baked with default settings and rendered with the package's own materials (textured presets, orthographic camera, URP).*
 
-## Shader (`FoliageForge.shadergraph`)
-Height gradient (bottom to top colour), per-card flutter, scrolling leaf texture, global wind. Wind maths lives in `Shaders/FoliageForge.hlsl`; the graph calls it through two Custom Function nodes. Global values: `_FF_WindDir` (xyz dir, w strength), `_FF_WindParams` (speed, gust frequency, gust contrast).
+## Highlights
 
-## Performance rules
-Cards are fixed quads with blended normals (billboarding is optional and off by default; fixed cards work fine with orthographic cameras). Leaf colour varies per branch clump (warm yellow to cool green, plus brightness); the leaf material's **Color Variation** slider (0–1, default 0.5) sets the amount. The **Renormalize** foldout replaces leaf normals with a smoothed density-proxy shell (Tightness, Strength) and bakes crown-interior AO into leaf vertex colour B (AOStrength); it runs at generation time and costs nothing at runtime. `Budget.MaxCards` is a hard cap; the window shows triangle count against `Budget.MaxTriangles`.
+- **Recipe to prefab**: one `TreeRecipe` asset per tree. Edit it live in the **Foliage Forge** window, press **Bake Prefab**, get mesh + two materials + prefab + LODs.
+- **Two draw calls per tree**: submesh 0 wood, submesh 1 leaf cards. Hard budgets for cards and triangles.
+- **Stylized look**: height gradient, per-clump colour variation, three-tone shadow banding, rim light, translucency, wrap light, moss on bark. All in two Shader Graphs.
+- **Many ways to shape a crown**: envelopes, clumps, hand-editable canopy **blobs** with deformable cages, fronds for conifers, hanging strands, sprite sheets, folded and curled cards.
+- **Variants and LODs**: bake sets of seed variants, automatic `LODGroup` with cross fade.
+- **GPU grass**: instanced clumps with wind, trample, ground-colour tint, distance LOD and a biome system.
+- **Foliage Brush**: paint trees, grass and any prefab into the scene with weighted palettes.
+- **Setup Wizard**: checks the URP asset, layers and shaders and fixes them in one click.
 
-## Look, textures and shaders
+## Requirements
 
-Two Shader Graphs: `FoliageForge` (leaf cards) and `FoliageForgeBark` (trunk and branches). Both share `FoliageForge.hlsl` and the same wind.
+- Unity **6000.0** or newer
+- Universal Render Pipeline **17.0.0+** and Shader Graph **17.0.0+** (declared as package dependencies)
 
-- **Leaves:** monochrome cutout texture, dark-to-light gradient (Bias) with per-card Jitter, per-branch Color Variation.
-- **Bark:** monochrome texture on the mesh UVs (u around, v along the wood, so it moves with the sway), height gradient, moss on upward-facing surfaces (Moss Amount/Sharpness/Tiling, optional breakup mask).
-- **Billboard** (Leaves): Off keeps fixed cards. ViewAligned turns every card to the camera, YAxis only around the vertical axis. The generator writes the card axes into UV2/UV3 (+32 bytes per vertex) only when it is not Off.
-- **Leaf cards fit the texture:** the generator measures the opaque part of the leaf texture (alpha > 0.5) and maps the card to it, so transparent padding no longer shrinks the leaf. Card size is the longer side of that part. **Roll** and **Roll Jitter** (Leaves) set how a card is turned: 0 keeps the texture top up, 180 hangs it, jitter 180 allows any rotation.
-- **Attach / Anchor** (Leaves): Attach 0 scatters cards around the branches, 1 grows every leaf from a point on a branch (the texture's Anchor, default bottom middle = the stem, sits on the branch; the leaf points along the branch and fans out). Use Anchor (0.5, 0.5) for star-shaped sprays. Under the Anchor fields a small picture of the leaf shows a red dot; click or drag in it to set the anchor.
-- **Crown Shape** (Leaves): Envelope (Sphere, Dome, Cone, Column, Umbrella) pulls leaves onto that silhouette and prunes level-1 branches to it (Sapling-style); Strength 0..1. **Clumps** gathers cards into N puffy blobs (Gather), bends their normals outward from each blob centre (Puffiness), and tints per blob (Tint Per Clump). 0 = off.
-- **Trunk > Character**: Taper Power, Twist (bark spirals), Root Lobes / Depth / Height (buttress flare at the base) and Gnarl (Perlin bumps along the wood).
-- **Leaf Shapes** (recipe foldout): **Sprite Sheet** Columns/Rows splits the leaf texture into a grid; each cell is trimmed on its own, empty cells are skipped, and every card picks a random cell. **Card Shape** turns cards into grids (Width/Length Segments) that Fold along the middle, Curl along the length and Twist, with per-card Jitter. Shaped cards cost `2 * width * length` triangles each, so the budget drops cards sooner; LOD1 halves the segments, LOD2 uses flat quads. Billboards flatten shaped cards.
-- The recipe's Look settings are written into the tool-made materials on every bake and live in the preview. Assign your own material in Look to opt out.
-- Texture wish list per preset: see [Textures.md](Textures.md).
+## Install
 
-## Structure and stylized shading
-All of these default to off, so older recipes build the same mesh. They use hashes and Perlin noise instead of the seed's random stream, so turning one on does not reshuffle the rest of the tree.
-- **Trunk > Noise / Branches > Noise**: Noise Bend and Frequency bend the wood along Perlin noise (the base stays put). Branches > Length Noise varies branch length smoothly up the trunk.
-- **Trunk > Split**: Splits cuts the trunk at Split Height into Splits + 1 stems that lean out by Split Angle; Braid turns them around each other (low split + braid = braided multi-stem). Branches and crown tops spread over the stems.
-- **Trunk > Roots**: exposed, half-buried roots that arch out of the base and curl up at the tip (Length, Radius, Wander, Curl).
-- **Branches > Character**: Asymmetry grows the lean side longer; Broken snaps that share of level-1 branches into short jagged stubs without leaves.
-- **Leaves**: Layout **Fronds** lays long cards along every end branch (conifer sprays, CardsPerBranch = fronds per branch, fanned by Roll Jitter, Fold droops them) plus a crossed leader on top. **On Inner Branches** also puts leaves on level-1 branches. **Tip Clumps** makes one puff per branch tip; **Shell** pushes a clump's cards to its surface, **Clump Height** squashes it, **Flatten Bottom** flattens its underside and turns those cards face-down (shelf look).
-- **Look > Stylized Shading** (leaf shader): Shadow Color/Amount/Softness = three-tone banding toward a coloured shadow; Rim Color/Strength/Power = fresnel edge, stronger on the lit side; Hue Shift = warm light, cool shadow; Tree Variation = per-tree tint from the object position.
-- Presets use these: Oak and Maple (blob canopies filled with small cards; their trunks differ: split stems and roots, multi-stem), Spruce (fronds), Dead (stubs + roots).
+Package Manager > **+** > *Add package from git URL*:
 
-## LODs, crossed cards, soft light
-- **LODs** (recipe foldout): Bake writes `<name>_LOD1.asset` and `<name>_LOD2.asset` and adds an `LODGroup` to the prefab (LOD0 is the root renderer, LOD1/LOD2 are child objects). LOD1 drops the twig level and keeps `Lod1CardShare` of the cards at larger size; LOD2 uses a plain trunk with `Lod2CardShare` of the cards, crossed when `Lod2Intersecting` is on. Transitions are screen heights. The simplified meshes use the same seed but a different random stream, so the silhouette is close, not identical.
-- **Leaves > Intersecting** (off by default): adds a second card through each card, turned 90 degrees about its up axis. Fuller from every side, doubles the cards (the budget counts both).
-- **Look > Translucency** (amount, colour, focus): light through the leaves toward the camera, `pow(dot(view, -(L + N*0.3)), focus)`, strongest when the sun is behind the tree. Unshadowed emission, so it also lights leaves the crown above shades. Needs a directional main light. Use the **Backlit** button in the preview (low sun behind the tree) to see it; with a high sun it barely shows.
-- **Look > Wrap**: the leaf shader adds the part of `N.L * 0.5 + 0.5` that plain Lambert lacks as unshadowed emission from the main light, so shaded sides stay soft. 0 = off.
-- **Leaves > Intersecting** is now on by default. **Layout > Hanging** drops strands of cards (Strand Length) straight down from each end branch; Roll 180 hangs the leaves tip down (no preset uses it yet). **Look > Stylized Shading** (off by default) gates shadow colour, rim, hue shift and tree variation; the sliders keep their values while it is off.
-- **Canopy blobs**: Leaves > Layout **Blobs** fills ellipsoid volumes (recipe > Canopy Blobs) with Cards Per Blob cards; Shell, Flatten Bottom and Puffiness shape each blob. The window's view bar switches **Wireframe** (wood as lines), **Blobs** (wood plus editable blobs) and **Finished**. In Blobs mode: Auto Blobs spreads Blob Count blobs over the branch tips, drag a blob to move it, scroll resizes it (Ctrl: height only), Delete or the Delete button removes it, Add Blob adds one. An empty blob list is suggested on the fly.
-- **Deforming blobs**: select a blob in Blobs mode to see its cage (26 points). Drag a point to reshape the blob (Shift: neighbours follow half as far); cards then fill the cage. Reset Shape makes it an ellipsoid again.
+```
+https://github.com/Meowdieval-Kingdom/MeowFoliageForge.git
+```
 
-## Grass (GPU instanced)
-Runtime grass, separate from the baked trees. `GameObject > Meowdieval > Grass Field` adds a **Grass Field** and a **Grass Profile** (`Assets/Foliage Forge/Grass.asset`).
-- **Field**: a box (local size) that grass fills. Rays go down from the box top onto the **Ground** layers (leave units and buildings out of that mask). Slopes over the profile's Slope Limit stay bare. Scatter is deterministic from Seed and reruns when you edit; nothing is saved.
-- **Grass types (ingredients)** (profile > Variants): a list of simple, single-purpose types (default Short, Tall, Fern, Dry sprig; each Biome brings its own, e.g. Moss lawn / Fern / Broad blades / Mushrooms). No pre-mixed tufts: you build the mix. Add, remove, reorder and switch types off freely (no count limit). Each has its own sprite (stock ones from `Textures/Flat`), density, clustering, size, card count, bend, colours, and a **Mix %** (0-100, default 100) that multiplies its density wherever types are combined: the field's fill and paint strokes, and the window preview. Lowering Mix thins a stable subset of that type. Every instance is a clump of crossed cards, so thickness comes from the mesh and the instance count stays low.
-- **Biome** replaces the type list with the biome's types (a type with the same name keeps its sprite, on/off and Mix). **Quality** resets the density of types whose name matches the biome's; other types keep theirs.
-- **Drawing**: `Graphics.RenderMeshInstanced`, 1023 clumps per call, per chunk. Chunks are frustum-culled per camera, and with **Distance LOD** the clump count halves and quarters with distance (survivors widen to keep the lawn full). Clumps shrink away at the draw distance.
-- **Features** (profile > Features, each is a plain uniform, off = skipped work): Wind, Texture, Gradient, Variation, Patches, Stylized Shading, Rim, Translucency, Ground Blend, Distance Fade, Receive Shadows, Cast Shadows, Distance LOD, Frustum Culling. **Lush / Balanced / Light** buttons set density, draw distance and the costly features in one click.
-- Uses the same `Foliage Wind` component as the trees.
-- Shader: `Meowdieval/Foliage Forge/Grass` (`Shaders/FoliageForgeGrass.shader`): alpha-to-coverage, per-blade normals, point/spot lights (Features > Additional Lights), wind, trample, ground-colour tint, smooth GPU distance thinning, shadow distance, DepthNormals pass. Each is a Features switch.
-- **Trample**: add `GrassTrampler` to units or effects; the 16 nearest bend the grass (Features > Trample).
-- **Ground colour**: the Grass Field inspector's *Capture Ground Colour* renders the ground top-down; enable Features > Ground Map.
-- **Window**: `Meowdieval > Foliage Forge` has a Trees | Grass switch. Grass mode edits a Grass Profile and previews a flat patch live (wind toggle works). Toolbar row 1: tab, Recipe / Profile field, New, Save As New... and Bake; row 2: Preset and Reroll Seed (Trees) or Biome, Quality, Reroll Seed and Batch size (Grass), plus **Foliage Brush** and **Setup Wizard** buttons. With nothing picked you edit an unsaved scratch tree or profile; a banner over the inspector says so and offers Save.... The Grass Profile inspector lists every grass type with its on/off toggle and Mix % above the full Variants list. The prefab gallery filters All / Trees / Grass; click picks a tile, double-click or Load opens it (switching tab).
+Or in `Packages/manifest.json`:
 
-## Tree type and variants
-- **Type Id** (recipe > Output > Type & Variants): the tree's type name, e.g. `Oak`. Applying a preset sets it, unless you typed your own name. *Origin Preset* beside it just shows the last preset used.
-- **Variants**: *Create 3 Variants* adds three entries, each with a Seed, a Scale Multiplier and a Blob Count Delta (-1..+1, Blobs layout; at least 1 blob stays). *Reroll Seeds* picks new seeds. Variants are applied to a temporary copy when generating, so the recipe itself never changes; on a Blobs layout the blobs are re-suggested for each variant's branches (hand-edited blobs apply to the plain recipe only).
-- **Variants view** (window preview): the variants side by side in a row.
-- **Bake All Variants** (window, row 2): writes `<Name>_V1.prefab`, `_V2`, ... plus `<Name>_Variants.asset` (a *Tree Variant Set*: Type Id, prefabs, weight per prefab, default 1) into the recipe's output folder. Variants share the recipe's two materials; prefabs of removed variants are deleted; set weights are kept.
-- **Brush**: add a Tree Variant Set to the Foliage Forge Manager's *Variant Sets* list. Each set counts as one palette entry at Mix 100%, and every placement picks a weighted random prefab from it.
+```json
+"com.meowdieval.foliageforge": "https://github.com/Meowdieval-Kingdom/MeowFoliageForge.git"
+```
 
-## Menu
-`Meowdieval > Foliage Forge >` **Foliage Forge Editor** (the window), **Foliage Brush** (the scene brush, see below), **Foliage Forge Validate** (checks shaders, folders, wind, manager, the URP asset and the Ground layer; results in the Console) and **Foliage Forge Setup Wizard** (the same checks with one-click fixes). The wizard opens by itself once per project, the first time the package loads after import; it never changes anything until you click a Fix.
+To develop on it, clone the repo and point the manifest at the folder: `"com.meowdieval.foliageforge": "file:../path/to/MeowFoliageForge"`.
 
-Setup rows are **Required** (a shader or feature breaks: main light per pixel, LOD Cross Fade, MSAA 4x when a Grass Profile uses alpha to coverage), **Recommended** (SRP Batcher, Depth Texture, main light shadows, the `Ground` layer and the manager's Ground mask, additional lights per pixel when a profile uses them) or **Optional** (shadow distance 30-150 m, soft shadows). Pipeline rows are checked on the current quality level's URP asset; tick *all quality levels* to cover every one. Fixes that edit a shared asset (the URP asset, Tags and Layers) ask once, log `[Foliage Forge] Set X: old -> new` to the Console and are undoable. Rendering path, GPU Resident Drawer, HDR and render scale are never touched.
+After import the **Setup Wizard** opens once. Apply the *Required* fixes, then you are ready.
 
-## Placing trees and grass
-`GameObject > Meowdieval > Foliage Forge` creates a **Meowdieval Foliage Forge** prefab (`Assets/Foliage Forge/`) with a Foliage Forge Manager, a Grass Field (paint-only) and a Props root.
-- **Foliage Brush**: `Meowdieval > Foliage Forge > Foliage Brush`, the manager's *Open Foliage Brush* button, or the Tools overlay. Nothing needs to be selected: it paints into the selected Foliage Forge (or Grass Field), else the first one in the scene, and offers *Create Foliage Forge* when there is none. Its scene-view panel (Overlays menu: *Foliage Brush*) holds everything below.
-- **Panel**: *Paint / Erase / Off* (Off or Esc leaves the tool), *Grass paint* (strokes on the Grass Field, scattered on mouse release) or *Prefabs* (instances under Props with density, tree / grass spacing, random yaw and scale). Left-drag paints, Shift inverts paint and erase, Shift+scroll sizes the brush, Alt orbits. Each stroke is one undo step.
-- **Palette**: thumbnails of every baked tree and grass batch (refreshed when the project changes); click to toggle. *+ Selected* adds other prefabs from the Project window. Each ticked tile shows a **Mix %** field (0-100, default 100): the brush picks palette entries by weighted random, so 50 / 30 / 20 places them in that proportion, and 0 never places it. The line above the thumbnails sums up the effective mix (e.g. `Short 50% / Tall 30% / Fern 20%`). Ticking several grass batches paints them mixed, so a tuft is whatever you tick; *Grass Spacing* controls how tightly they overlap.
-- **Grass paint mix**: in *Grass paint* the panel lists the Grass Profile's types with an on/off box and a Mix % slider, plus the resulting clump share. These write to the profile (undoable), so every stroke and the fill of each field using that profile re-blend; strokes do not remember the mix they were painted with.
-- **Ground**: the panel's Ground mask (shared by the manager and its Grass Field) needs colliders. The panel and the cursor label say why nothing happens: empty palette, a collider on a layer outside the mask (*Add layer* fixes it), or no collider at all (props then land on a flat plane at the manager's height, shown in yellow; grass needs a collider). New Foliage Forges include the `Ground` layer. Keep the layers of placed props out of the mask, or grass grows on trees (the inspector warns).
-- **Bake Prefabs / Overwrite Prefabs / Save As New** (window, Grass mode, top right like the tree): bakes every enabled grass type into its own small circular batch prefab under `Grass/<profile>/` (size = the number field in the toolbar), at full Density (Mix % is not baked in; blend batches with the palette Mix %). Each clump keeps its own wind, gust and thinning (origin in UV1). Overwrite rewrites the same assets in place; Save As New copies the profile and bakes the copy. Loading a batch from the gallery switches to the Grass tab with its profile; loading a tree switches back to Trees.
+## Quick start
 
+1. `Meowdieval > Foliage Forge > Foliage Forge Editor`.
+2. Press **New**, pick a preset (Oak, Maple, Spruce, Dead).
+3. Edit settings on the left; the preview rebuilds as you type. Drag to orbit, scroll to zoom, double-click to reset.
+4. **Bake Prefab** writes `Assets/Foliage Forge/<recipe name>/` (mesh, bark and leaf materials, prefab).
+5. `GameObject > Meowdieval > Foliage Forge` adds a manager; open the **Foliage Brush** and paint.
+6. Add one **Foliage Wind** component to the scene so everything sways.
+
+Full walkthrough: [Getting started](Documentation~/getting-started.md).
+
+## Documentation
+
+| Page | Covers |
+|---|---|
+| [Getting started](Documentation~/getting-started.md) | Window tour, first tree, baking, wind |
+| [Trees](Documentation~/trees.md) | Trunk, branches, roots, crown shape, blobs, fronds, budgets |
+| [Leaves, look and shaders](Documentation~/look-and-shaders.md) | Cards, textures, gradient, stylized shading, translucency, mesh layout, wind |
+| [Variants and LODs](Documentation~/variants-and-lods.md) | Type Id, seed variants, variant sets, LOD meshes |
+| [Grass](Documentation~/grass.md) | Grass field, profile, types, biomes, features, trample, baked batches |
+| [Foliage Brush](Documentation~/brush.md) | Scene painting, palette, mix %, ground and layers |
+| [Setup and validation](Documentation~/setup.md) | Wizard rows, validate menu, URP settings |
+| [Textures](Documentation~/textures.md) | Texture rules and the per-preset list |
+| [Architecture](Documentation~/architecture.md) | Code layout for contributors |
+
+## Gallery
+
+| Backlit (translucency) | Seen from the side |
+|---|---|
+| ![Oak backlit](Documentation~/images/oak-backlit.png) | ![Oak side](Documentation~/images/oak-side.png) |
+
+## Menu reference
+
+| Menu | Does |
+|---|---|
+| `Meowdieval > Foliage Forge > Foliage Forge Editor` | The tree and grass editor window |
+| `... > Foliage Brush` | Scene painting tool |
+| `... > Foliage Forge Validate` | Checks shaders, folders, wind, manager, URP asset, Ground layer; results in the Console |
+| `... > Foliage Forge Setup Wizard` | The same checks with one-click fixes |
+| `... > Re-apply Presets To Recipes` | Re-applies preset values to existing recipes |
+| `GameObject > Meowdieval > Foliage Forge` | Prefab with manager, paint-only grass field and props root |
+| `GameObject > Meowdieval > Grass Field` | A grass field plus a Grass Profile |
+| `Assets > Create > Meowdieval > Foliage Forge > Tree Recipe` | A new recipe asset |
+
+## Tests
+
+Editor tests live in `Tests/Editor` (generator, recipe editor, variants, brush, grass scatter and math, setup). Run them from the Test Runner, *EditMode*.
+
+## Screenshots
+
+The images here are renders of baked presets made with the package's own materials. Screenshots of the editor window itself are not included yet.

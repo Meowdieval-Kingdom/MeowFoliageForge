@@ -5,7 +5,7 @@ namespace Meowdieval.FoliageForge
 {
     /// <summary>
     /// Stand-in bark and moss textures for the presets, kept in the package's Textures/Noise folder. Missing files simply stay empty,
-    /// so the package keeps working without them. Swap for real bark textures later (see Textures.md).
+    /// so the package keeps working without them. Swap for real bark textures later (see Documentation~/textures.md).
     /// </summary>
     public static class PresetTextures
     {
