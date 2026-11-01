@@ -384,7 +384,7 @@ namespace Meowdieval.FoliageForge
                 for (int i = _pending.Count - 1; i >= 0; i--)
                 {
                     GameObject prefab = _pending[i].prefab;
-                    Texture2D preview = prefab != null ? AssetPreview.GetAssetPreview(prefab) : null;
+                    Texture2D preview = prefab != null ? PrefabThumbnail.Get(prefab) : null;
                     if (prefab != null && preview == null) continue;
                     if (preview != null) _pending[i].image.image = preview;
                     _pending.RemoveAt(i);
@@ -418,7 +418,7 @@ namespace Meowdieval.FoliageForge
                     borderTopWidth = 2, borderBottomWidth = 2, borderLeftWidth = 2, borderRightWidth = 2,
                 },
             };
-            Texture2D preview = AssetPreview.GetAssetPreview(prefab);
+            Texture2D preview = PrefabThumbnail.Get(prefab);
             var image = new Image { image = preview != null ? preview : AssetPreview.GetMiniThumbnail(prefab), scaleMode = ScaleMode.ScaleToFit, style = { width = 52, height = 52 } };
             if (preview == null) _pending.Add((image, prefab));
             tile.Add(image);

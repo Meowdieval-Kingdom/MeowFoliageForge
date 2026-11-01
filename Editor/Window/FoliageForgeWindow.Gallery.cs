@@ -164,7 +164,7 @@ namespace Meowdieval.FoliageForge
                 foreach (var (image, go) in images)
                 {
                     if (image.image != null) continue;
-                    Texture2D preview = AssetPreview.GetAssetPreview(go);
+                    Texture2D preview = PrefabThumbnail.Get(go);
                     if (preview != null) image.image = preview;
                     else pending = true;
                 }
