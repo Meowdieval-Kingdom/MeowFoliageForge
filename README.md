@@ -1,5 +1,10 @@
 # Foliage Forge
 
+![Unity](https://img.shields.io/badge/Unity-6%2B-black)
+![URP](https://img.shields.io/badge/URP-17%2B-black)
+![Shader Graph](https://img.shields.io/badge/Shader%20Graph-17%2B-black)
+![Version](https://img.shields.io/github/package-json/v/Meowdieval-Kingdom/MeowFoliageForge?label=version&color=black)
+
 Procedural stylized foliage for Unity (URP). Design a tree as a **recipe** (seed + settings), bake it to a mesh and prefab, and place it with a scene brush. Add GPU-instanced grass on top. Trees are baked in the editor; nothing generates at runtime.
 
 | Oak | Maple | Spruce | Dead |
