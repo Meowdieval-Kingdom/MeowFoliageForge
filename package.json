@@ -4,6 +4,8 @@
   "displayName": "Foliage Forge",
   "description": "Procedural stylized foliage for URP. Design trees as recipes (trunk, roots, branches, canopy blobs, fronds), bake them to mesh, materials, prefab and LODs, and paint them into scenes with the Foliage Brush. Includes GPU-instanced grass with biomes, trample and wind, seed variants, and a wind, gradient and translucency Shader Graph.",
   "unity": "6000.0",
+  "license": "CC-BY-4.0",
+  "licensesUrl": "https://creativecommons.org/licenses/by/4.0/",
   "dependencies": {
     "com.unity.render-pipelines.universal": "17.0.0",
     "com.unity.shadergraph": "17.0.0"

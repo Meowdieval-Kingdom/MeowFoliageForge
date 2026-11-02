@@ -3,6 +3,7 @@
 ![Unity](https://img.shields.io/badge/Unity-6%2B-black)
 ![URP](https://img.shields.io/badge/URP-17%2B-black)
 ![Shader Graph](https://img.shields.io/badge/Shader%20Graph-17%2B-black)
+![License](https://img.shields.io/badge/license-CC%20BY%204.0-black)
 ![Version](https://img.shields.io/github/package-json/v/Meowdieval-Kingdom/MeowFoliageForge?label=version&color=black)
 
 Procedural stylized foliage for Unity (URP). Design a tree as a **recipe** (seed + settings), bake it to a mesh and prefab, and place it with a scene brush. Add GPU-instanced grass on top. Trees are baked in the editor; nothing generates at runtime.
@@ -100,3 +101,7 @@ Editor tests live in `Tests/Editor` (generator, recipe editor, variants, brush, 
 ## Images
 
 The images here are renders of baked presets made with the package's own materials. The editor window is described in [The window](Documentation~/window.md).
+
+## License
+
+[Creative Commons Attribution 4.0 International (CC BY 4.0)](LICENSE.md). Use it, change it and ship it in commercial projects, but credit Katzenbande and link the license.
