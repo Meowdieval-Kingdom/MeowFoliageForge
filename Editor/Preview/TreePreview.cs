@@ -36,6 +36,11 @@ namespace Meowdieval.FoliageForge
         const int MaxArrows = 300;
         const float ArrowLength = 0.15f;
 
+        /// <summary>Turns the camera around the tree. Yaw lives here, so the angle and this flag survive switching prefabs.</summary>
+        public bool AutoRotate;
+        const float AutoRotateSpeed = 25f; // degrees per second
+        double _lastTime;
+
         public bool Orthographic = true;
         public bool ShowGround = true;
         /// <summary>Draws the leaves in the Render and Wireframe views; off leaves just the wood.</summary>
@@ -119,6 +124,9 @@ namespace Meowdieval.FoliageForge
             _lastBlobs = blobs;
             HandleInput(rect, blobs);
             if (Event.current.type != EventType.Repaint || mesh == null) return;
+            double now = EditorApplication.timeSinceStartup;
+            if (AutoRotate && !_dragging && _dragPoint < 0) _yaw += (float)Math.Min(now - _lastTime, 0.1) * AutoRotateSpeed;
+            _lastTime = now;
 
             bool row = Mode == PreviewMode.Variants && VariantMeshes != null && VariantMeshes.Length > 0 && VariantOffsets != null && VariantOffsets.Length == VariantMeshes.Length;
             Bounds b = mesh.bounds;

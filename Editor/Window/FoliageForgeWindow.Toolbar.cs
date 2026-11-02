@@ -133,6 +133,8 @@ namespace Meowdieval.FoliageForge
             _modeRow.Add(ModeButton("Blob", PreviewMode.Blob, "Generate the selected blob (the first when none is selected) alone at the origin, to judge its leaf groups."));
             _modeRow.Add(ModeButton("Variants", PreviewMode.Variants, "The recipe's variants side by side, each with its own seed, size and blob count."));
             bar.Add(_modeRow);
+            bar.Add(BigToggle("Auto Rotate", _preview.AutoRotate, v => _preview.AutoRotate = v, "Slowly turn the preview around the tree. Drag to take over; the angle is kept when you switch prefabs."));
+            bar.schedule.Execute(() => { if (_preview.AutoRotate) _view?.MarkDirtyRepaint(); }).Every(16); // ponytail: ticks even when off (cheap check); pause it if that ever shows in a profile
             bar.Add(BigToggle("Ortho", _preview.Orthographic, v =>
             {
                 _preview.Orthographic = v;
