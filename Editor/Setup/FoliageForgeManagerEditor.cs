@@ -14,13 +14,13 @@ namespace Meowdieval.FoliageForge
 
             EditorGUILayout.Space();
             bool active = FoliageBrush.IsActive;
-            if (GUILayout.Button(active ? "Close Foliage Brush" : "Open Foliage Brush", GUILayout.Height(26)))
+            if (GUILayout.Button(active ? "Close Foliage Brush" : "Open Foliage Brush", GUILayout.Height(30)))
             {
                 if (active) FoliageBrush.Close();
                 else FoliageBrush.Open();
             }
             EditorGUILayout.HelpBox("Paint, erase and pick the palette in the Foliage Brush panel of the scene view (also Meowdieval > Foliage Forge > Foliage Brush, or the Tools overlay).", MessageType.None);
-            if (GUILayout.Button("Open Foliage Forge Window")) FoliageForgeWindow.Open();
+            if (GUILayout.Button("Open Foliage Forge Window", GUILayout.Height(24))) FoliageForgeWindow.Open();
 
             if (m.Props != null)
                 for (int i = 0; i < m.Props.childCount; i++)
@@ -33,11 +33,11 @@ namespace Meowdieval.FoliageForge
             EditorGUILayout.Space();
             string stats = m.Props != null ? $"{m.Props.childCount} props" : "no props root";
             if (m.Grass != null) stats += $", {m.Grass.StrokeCount} grass strokes, {m.Grass.InstanceCount:N0} clumps";
-            EditorGUILayout.LabelField(stats, EditorStyles.miniLabel);
+            EditorGUILayout.LabelField(stats, EditorStyles.label);
             using (new EditorGUILayout.HorizontalScope())
             {
                 using (new EditorGUI.DisabledScope(m.Grass == null || m.Grass.StrokeCount == 0))
-                    if (GUILayout.Button("Clear Grass Paint") && EditorUtility.DisplayDialog("Clear grass paint", "Remove every grass brush stroke?", "Clear", "Cancel"))
+                    if (GUILayout.Button("Clear Grass Paint", GUILayout.Height(24)) && EditorUtility.DisplayDialog("Clear grass paint", "Remove every grass brush stroke?", "Clear", "Cancel"))
                     {
                         Undo.RecordObject(m.Grass, "Clear Grass Paint");
                         m.Grass.ClearStrokes();
@@ -45,7 +45,7 @@ namespace Meowdieval.FoliageForge
                         PrefabUtility.RecordPrefabInstancePropertyModifications(m.Grass);
                     }
                 using (new EditorGUI.DisabledScope(m.Props == null || m.Props.childCount == 0))
-                    if (GUILayout.Button("Clear Props") && EditorUtility.DisplayDialog("Clear props", "Delete every placed prop?", "Delete", "Cancel"))
+                    if (GUILayout.Button("Clear Props", GUILayout.Height(24)) && EditorUtility.DisplayDialog("Clear props", "Delete every placed prop?", "Delete", "Cancel"))
                         for (int i = m.Props.childCount - 1; i >= 0; i--) Undo.DestroyObjectImmediate(m.Props.GetChild(i).gameObject);
             }
         }

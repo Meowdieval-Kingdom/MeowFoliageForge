@@ -15,10 +15,6 @@ namespace Meowdieval.FoliageForge
     /// </summary>
     public sealed partial class FoliageForgeWindow : EditorWindow
     {
-        static readonly Color Ok = new Color(0.2f, 0.45f, 0.3f);
-        static readonly Color Warn = new Color(0.65f, 0.42f, 0.08f);
-        static readonly Color Neutral = new Color(0.25f, 0.27f, 0.28f);
-
         /// <summary>Name of the element that hosts the recipe inspector; the inspector hides its own open button inside it.</summary>
         public const string InspectorHostName = "ff-inspector-host";
 
@@ -41,8 +37,14 @@ namespace Meowdieval.FoliageForge
         Label _status;
         ToolbarButton _bakeButton;
         IVisualElementScheduledItem _regen;
-        ScrollView _tiles;
+        VisualElement _tiles;
+        [SerializeField] bool _smallThumbs;
         Label _galleryTitle, _folderLabel;
+        // responsive layout: the split is rebuilt when the width crosses the stacking breakpoint
+        const float CompactWidth = 700f, StackedWidth = 900f;
+        VisualElement _splitHost, _right, _secondaryRow;
+        TwoPaneSplitView _split;
+        bool? _stacked;
         Button _loadButton;
         GameObject _picked; // tile picked in the gallery, loaded by the button under it
         VisualElement _windPanel, _blobPanel;
@@ -80,7 +82,7 @@ namespace Meowdieval.FoliageForge
         public static void Open(TreeRecipe recipe)
         {
             var window = GetWindow<FoliageForgeWindow>("Foliage Forge");
-            window.minSize = new Vector2(780f, 560f);
+            window.minSize = new Vector2(420f, 480f);
             window.Show();
             window.Focus();
             if (recipe != null) window.SetRecipe(recipe);
@@ -131,6 +133,7 @@ namespace Meowdieval.FoliageForge
         {
             VisualElement root = rootVisualElement;
             root.style.flexGrow = 1;
+            FoliageUi.Apply(root);
             _unsaved = new HelpBox(string.Empty, HelpBoxMessageType.Info);
             _unsaved.Add(new Button(() =>
             {
@@ -139,22 +142,36 @@ namespace Meowdieval.FoliageForge
             }) { text = "Save...", tooltip = "Save it as an asset so it can be picked again later." });
             root.Add(BuildToolbar());
 
-            var split = new TwoPaneSplitView(0, 360f, TwoPaneSplitViewOrientation.Horizontal) { style = { flexGrow = 1 } };
             _inspectorHost = new ScrollView { name = InspectorHostName };
-            split.Add(_inspectorHost);
+            _inspectorHost.AddToClassList("ff-inspector");
 
-            var right = new VisualElement { style = { flexGrow = 1, minWidth = 320 } };
-            right.Add(BuildViewBar());
-            _view = new IMGUIContainer(DrawPreview) { style = { flexGrow = 1, flexShrink = 1, flexBasis = 0, minHeight = 120 } };
-            right.Add(_view);
-            _statsBar = new VisualElement { style = { flexShrink = 0, flexDirection = FlexDirection.Row, flexWrap = Wrap.Wrap, paddingLeft = 6, paddingTop = 4, paddingBottom = 4 } };
-            right.Add(_statsBar);
-            _status = new Label { style = { flexShrink = 0, paddingLeft = 8, paddingRight = 8, paddingBottom = 4, opacity = 0.9f, whiteSpace = WhiteSpace.Normal } };
-            right.Add(_status);
+            // right column: view bar and preview keep their height; stats, status, panels and the gallery scroll below
+            _right = new VisualElement();
+            _right.AddToClassList("ff-right");
+            _right.Add(BuildViewBar());
+            _view = new IMGUIContainer(DrawPreview);
+            _view.AddToClassList("ff-preview");
+            _right.Add(_view);
+            var scroll = new ScrollView(ScrollViewMode.Vertical);
+            scroll.AddToClassList("ff-right-scroll");
+            scroll.contentContainer.AddToClassList("ff-side-content");
+            _statsBar = new VisualElement();
+            _statsBar.AddToClassList("ff-row");
+            _statsBar.AddToClassList("ff-stats");
+            scroll.Add(_statsBar);
+            _status = new Label();
+            _status.AddToClassList("ff-status");
+            scroll.Add(_status);
+            scroll.Add(BuildBlobPanel());
+            scroll.Add(BuildWindPanel());
             _galleryBox = BuildGallery();
-            right.Add(_galleryBox);
-            split.Add(right);
-            root.Add(split);
+            scroll.Add(_galleryBox);
+            _right.Add(scroll);
+
+            _splitHost = new VisualElement { style = { flexGrow = 1 } };
+            root.Add(_splitHost);
+            RebuildSplit(false);
+            root.RegisterCallback<GeometryChangedEvent>(e => ApplyResponsiveLayout(e.newRect.width));
 
             root.schedule.Execute(() =>
             {
@@ -162,6 +179,42 @@ namespace Meowdieval.FoliageForge
             }).Every(50);
             RefreshGallery();
             SetGrassMode(_grassMode);
+        }
+
+        // width breakpoints: below CompactWidth secondary toolbar actions move into the More menu;
+        // below StackedWidth the split goes vertical (preview on top, settings below)
+        private void ApplyResponsiveLayout(float width)
+        {
+            if (float.IsNaN(width) || width <= 0f) return;
+            rootVisualElement.EnableInClassList("ff-compact", width < CompactWidth);
+            bool stacked = width < StackedWidth;
+            if (_stacked != stacked) RebuildSplit(stacked);
+        }
+
+        // TwoPaneSplitView cannot be assumed to switch orientation in place, so a new one takes over the two panes
+        private void RebuildSplit(bool stacked)
+        {
+            _stacked = stacked;
+            _split?.RemoveFromHierarchy();
+            _inspectorHost.RemoveFromHierarchy();
+            _right.RemoveFromHierarchy();
+            _right.EnableInClassList("ff-right--stacked", stacked);
+            _inspectorHost.EnableInClassList("ff-inspector--stacked", stacked);
+            if (stacked)
+            {
+                float top = Mathf.Max(300f, rootVisualElement.layout.height * 0.45f);
+                _split = new TwoPaneSplitView(0, top, TwoPaneSplitViewOrientation.Vertical);
+                _split.Add(_right);
+                _split.Add(_inspectorHost);
+            }
+            else
+            {
+                _split = new TwoPaneSplitView(0, 360f, TwoPaneSplitViewOrientation.Horizontal);
+                _split.Add(_inspectorHost);
+                _split.Add(_right);
+            }
+            _split.style.flexGrow = 1;
+            _splitHost.Add(_split);
         }
 
         private void OnProjectChange() => RefreshGallery();

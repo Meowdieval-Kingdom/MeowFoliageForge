@@ -18,12 +18,8 @@ namespace Meowdieval.FoliageForge
             _treeTools.style.display = _treePresets.style.display = _modeRow.style.display = tree;
             _grassTools.style.display = _grassPresets.style.display = on ? DisplayStyle.Flex : DisplayStyle.None;
             _blobPanel.style.display = !on && InBlobPanelMode ? DisplayStyle.Flex : DisplayStyle.None;
-            _tabTrees.style.backgroundColor = on ? new Color(0.2f, 0.2f, 0.2f) : new Color(0.2f, 0.4f, 0.62f);
-            _tabGrass.style.backgroundColor = on ? new Color(0.2f, 0.4f, 0.62f) : new Color(0.2f, 0.2f, 0.2f);
-            _tabTrees.style.unityFontStyleAndWeight = on ? FontStyle.Normal : FontStyle.Bold; // not colour alone
-            _tabGrass.style.unityFontStyleAndWeight = on ? FontStyle.Bold : FontStyle.Normal;
-            _tabTrees.style.opacity = on ? 0.7f : 1f;
-            _tabGrass.style.opacity = on ? 1f : 0.7f;
+            FoliageUi.SetChipOn(_tabTrees, !on);
+            FoliageUi.SetChipOn(_tabGrass, on);
             if (_status != null) _status.text = string.Empty;
             if (on) BindGrass();
             else BindRecipe();
@@ -110,13 +106,15 @@ namespace Meowdieval.FoliageForge
             _patch.Build(_grass);
             _statsBar.Clear();
             int on = _grass.Features.EnabledCount();
-            _statsBar.Add(Chip("Preview clumps", _patch.ClumpCount.ToString("N0"), Ok));
-            _statsBar.Add(Chip("Triangles", _patch.Triangles.ToString("N0"), Neutral));
-            _statsBar.Add(Chip("Per metre", $"{_patch.ClumpCount / (_patch.Size * _patch.Size):0.0} clumps/m²", Neutral));
-            _statsBar.Add(Chip("Features on", on.ToString(), Neutral));
-            _statsBar.Add(Chip("Draw distance", $"{_grass.DrawDistance:0} m", Neutral));
-            _statsBar.Add(new Label("Flat preview patch. Trample, ground map, additional lights and shadows only show in the scene.")
-                { style = { opacity = 0.75f, whiteSpace = WhiteSpace.Normal, alignSelf = Align.Center } });
+            _statsBar.Add(FoliageUi.StatChip("Preview clumps", _patch.ClumpCount.ToString("N0"), StatKind.Ok));
+            _statsBar.Add(FoliageUi.StatChip("Triangles", _patch.Triangles.ToString("N0")));
+            _statsBar.Add(FoliageUi.StatChip("Per metre", $"{_patch.ClumpCount / (_patch.Size * _patch.Size):0.0} clumps/m²"));
+            _statsBar.Add(FoliageUi.StatChip("Features on", on.ToString()));
+            _statsBar.Add(FoliageUi.StatChip("Draw distance", $"{_grass.DrawDistance:0} m"));
+            var note = new Label("Flat preview patch. Trample, ground map, additional lights and shadows only show in the scene.");
+            note.AddToClassList("ff-muted");
+            note.AddToClassList("ff-hint");
+            _statsBar.Add(note);
             _view?.MarkDirtyRepaint();
         }
     }

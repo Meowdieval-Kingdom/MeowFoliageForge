@@ -4,6 +4,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.UIElements;
 using Object = UnityEngine.Object;
 
 namespace Meowdieval.FoliageForge
@@ -107,15 +108,20 @@ namespace Meowdieval.FoliageForge
     /// <summary>Checklist window with one-click fixes. Opens once per project after the package is first imported; nothing changes until a Fix is clicked.</summary>
     public sealed class FoliageForgeSetupWizard : EditorWindow
     {
+        const string SheetPath = "Packages/com.meowdieval.foliageforge/Editor/Setup/FoliageForgeSetup.uss";
+
         List<SetupCheck> _checks = new List<SetupCheck>();
-        Vector2 _scroll;
         bool _showPassed;
+        Label _quality;
+        Toggle _allLevels;
+        VisualElement _list;
+        Button _fixRequired, _fixRecommended;
 
         [MenuItem("Meowdieval/Foliage Forge/Foliage Forge Setup Wizard", false, 3)]
         public static void Open()
         {
             var w = GetWindow<FoliageForgeSetupWizard>(true, "Foliage Forge Setup", true);
-            w.minSize = new Vector2(520f, 480f);
+            w.minSize = new Vector2(420f, 400f);
             w.Refresh();
             w.Show();
         }
@@ -125,76 +131,140 @@ namespace Meowdieval.FoliageForge
         private void OnHierarchyChange() => Refresh();
         private void OnProjectChange() => Refresh();
 
+        private void CreateGUI()
+        {
+            VisualElement root = rootVisualElement;
+            root.Clear();
+            FoliageUi.Apply(root);
+            var sheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(SheetPath);
+            if (sheet != null && !root.styleSheets.Contains(sheet)) root.styleSheets.Add(sheet);
+            root.style.paddingLeft = 8;
+            root.style.paddingRight = 8;
+            root.style.paddingTop = 6;
+            root.style.paddingBottom = 6;
+
+            var heading = new Label("Foliage Forge Setup");
+            heading.AddToClassList("ffs-heading");
+            root.Add(heading);
+            var intro = new Label("Trees are made and baked in the Foliage Forge Editor. Grass and placed trees are painted with the Foliage Forge Manager. Fix anything below marked as missing.");
+            intro.AddToClassList("ff-hint");
+            root.Add(intro);
+
+            _quality = new Label();
+            _quality.AddToClassList("ff-muted");
+            _quality.style.whiteSpace = WhiteSpace.Normal;
+            root.Add(_quality);
+            _allLevels = new Toggle("Check and fix the URP assets of all quality levels") { value = FoliageForgeProjectSettings.AllQualityLevels };
+            _allLevels.RegisterValueChangedCallback(e =>
+            {
+                FoliageForgeProjectSettings.AllQualityLevels = e.newValue;
+                Refresh();
+            });
+            root.Add(_allLevels);
+
+            var scroll = new ScrollView { style = { flexGrow = 1, marginTop = 4 } };
+            _list = scroll.contentContainer;
+            root.Add(scroll);
+
+            root.Add(new HelpBox("Left as they are on purpose: rendering path (Forward / Forward+ / Deferred), GPU Resident Drawer, HDR and render scale. Foliage Forge works with any of them.", HelpBoxMessageType.Info));
+
+            var footer = new VisualElement();
+            footer.AddToClassList("ffs-footer");
+            _fixRequired = FooterButton(footer, "Fix All Required", null, () => ApplyFixes(_checks.Where(c => !c.Ok && c.Fix != null && c.Severity == SetupSeverity.Required)));
+            _fixRecommended = FooterButton(footer, "Fix All Recommended", "Fixes Required and Recommended rows. Optional rows only change through their own Fix button.",
+                () => ApplyFixes(_checks.Where(c => !c.Ok && c.Fix != null && c.Severity != SetupSeverity.Optional)));
+            FooterButton(footer, "Open Foliage Forge Editor", null, () => FoliageForgeWindow.Open());
+            root.Add(footer);
+
+            Refresh();
+        }
+
+        private static Button FooterButton(VisualElement parent, string text, string tooltip, Action click)
+        {
+            var b = new Button(click) { text = text, tooltip = tooltip };
+            b.AddToClassList("ff-button");
+            b.AddToClassList("ff-button--primary");
+            parent.Add(b);
+            return b;
+        }
+
         private void Refresh()
         {
             _checks = FoliageForgeValidate.Run();
-            Repaint();
-        }
-
-        private void OnGUI()
-        {
-            EditorGUILayout.Space(6);
-            EditorGUILayout.LabelField("Foliage Forge Setup", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("Trees are made and baked in the Foliage Forge Editor. Grass and placed trees are painted with the Foliage Forge Manager. Fix anything below marked as missing.", MessageType.None);
+            if (_list == null) return;
 
             RenderPipelineAsset current = FoliageForgeProjectSettings.CurrentPipeline();
-            EditorGUILayout.LabelField($"Quality level: {QualitySettings.names[QualitySettings.GetQualityLevel()]}, pipeline asset: {(current != null ? current.name : "none")}", EditorStyles.miniLabel);
-            EditorGUI.BeginChangeCheck();
-            FoliageForgeProjectSettings.AllQualityLevels = EditorGUILayout.ToggleLeft("Check and fix the URP assets of all quality levels", FoliageForgeProjectSettings.AllQualityLevels);
-            if (EditorGUI.EndChangeCheck()) Refresh();
+            _quality.text = $"Quality level: {QualitySettings.names[QualitySettings.GetQualityLevel()]}, pipeline asset: {(current != null ? current.name : "none")}";
+            _allLevels.SetValueWithoutNotify(FoliageForgeProjectSettings.AllQualityLevels);
 
             // failing rows grouped by severity; passing rows folded into one line
-            _scroll = EditorGUILayout.BeginScrollView(_scroll);
+            _list.Clear();
             int failing = 0;
             foreach (SetupSeverity severity in Enum.GetValues(typeof(SetupSeverity)))
             {
                 List<SetupCheck> rows = _checks.Where(c => !c.Ok && c.Severity == severity).ToList();
                 if (rows.Count == 0) continue;
                 failing += rows.Count;
-                EditorGUILayout.Space(4);
-                EditorGUILayout.LabelField($"{severity} ({rows.Count} to fix)", EditorStyles.boldLabel);
-                foreach (SetupCheck c in rows) DrawRow(c);
+                var title = new Label($"{severity} ({rows.Count} to fix)");
+                title.AddToClassList("ff-group-label");
+                title.style.marginTop = 4;
+                title.style.marginBottom = 2;
+                _list.Add(title);
+                foreach (SetupCheck c in rows) _list.Add(BuildRow(c));
             }
-            if (failing == 0) EditorGUILayout.HelpBox("Everything is set up. Nothing to fix.", MessageType.Info);
+            if (failing == 0) _list.Add(new HelpBox("Everything is set up. Nothing to fix.", HelpBoxMessageType.Info));
             List<SetupCheck> passed = _checks.Where(c => c.Ok).ToList();
             if (passed.Count > 0)
             {
-                EditorGUILayout.Space(4);
-                _showPassed = EditorGUILayout.Foldout(_showPassed, $"{passed.Count} checks passed", true, EditorStyles.foldoutHeader);
-                if (_showPassed) foreach (SetupCheck c in passed) DrawRow(c);
+                var fold = new Foldout { text = $"{passed.Count} checks passed", value = _showPassed };
+                fold.RegisterValueChangedCallback(e =>
+                {
+                    if (e.target == fold) _showPassed = e.newValue;
+                });
+                foreach (SetupCheck c in passed) fold.Add(BuildRow(c));
+                _list.Add(fold);
             }
-            EditorGUILayout.EndScrollView();
 
-            EditorGUILayout.HelpBox("Left as they are on purpose: rendering path (Forward / Forward+ / Deferred), GPU Resident Drawer, HDR and render scale. Foliage Forge works with any of them.", MessageType.Info);
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                using (new EditorGUI.DisabledScope(!_checks.Any(c => !c.Ok && c.Fix != null && c.Severity == SetupSeverity.Required)))
-                    if (GUILayout.Button("Fix All Required", GUILayout.Height(26)))
-                        ApplyFixes(_checks.Where(c => !c.Ok && c.Fix != null && c.Severity == SetupSeverity.Required));
-                using (new EditorGUI.DisabledScope(!_checks.Any(c => !c.Ok && c.Fix != null && c.Severity != SetupSeverity.Optional)))
-                    if (GUILayout.Button(new GUIContent("Fix All Recommended", "Fixes Required and Recommended rows. Optional rows only change through their own Fix button."), GUILayout.Height(26)))
-                        ApplyFixes(_checks.Where(c => !c.Ok && c.Fix != null && c.Severity != SetupSeverity.Optional));
-                if (GUILayout.Button("Open Foliage Forge Editor", GUILayout.Height(26))) FoliageForgeWindow.Open();
-            }
-            EditorGUILayout.Space(4);
+            _fixRequired.SetEnabled(_checks.Any(c => !c.Ok && c.Fix != null && c.Severity == SetupSeverity.Required));
+            _fixRecommended.SetEnabled(_checks.Any(c => !c.Ok && c.Fix != null && c.Severity != SetupSeverity.Optional));
         }
 
-        // icon plus explicit Passed / To fix text, so the state never rests on colour alone
-        private void DrawRow(SetupCheck c)
+        // severity pill with explicit text (Passed / Required / Recommended / Optional), so the state never rests on colour alone
+        private VisualElement BuildRow(SetupCheck c)
         {
-            using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
+            var card = new VisualElement();
+            card.AddToClassList("ff-panel");
+
+            var header = new VisualElement();
+            header.AddToClassList("ff-row");
+            string kind = c.Ok ? "ok" : c.Severity == SetupSeverity.Required ? "bad" : c.Severity == SetupSeverity.Recommended ? "warn" : "neutral";
+            var pill = new Label(c.Ok ? "Passed" : c.Severity.ToString());
+            pill.AddToClassList("ffs-pill");
+            pill.AddToClassList("ffs-pill--" + kind);
+            header.Add(pill);
+            var nameLabel = new Label(c.Name);
+            nameLabel.AddToClassList("ffs-row-title");
+            nameLabel.style.minWidth = 120;
+            header.Add(nameLabel);
+            if (!c.Ok && c.Fix != null)
             {
-                string icon = c.Ok ? "TestPassed" : c.Severity == SetupSeverity.Required ? "TestFailed" : c.Severity == SetupSeverity.Recommended ? "console.warnicon.sml" : "console.infoicon.sml";
-                GUILayout.Label(EditorGUIUtility.IconContent(icon), GUILayout.Width(22), GUILayout.Height(22));
-                using (new EditorGUILayout.VerticalScope())
-                {
-                    EditorGUILayout.LabelField($"{c.Name}   [{(c.Ok ? "Passed" : "To fix")}, {c.Severity}]", EditorStyles.boldLabel);
-                    if (c.Current != null) EditorGUILayout.LabelField(c.Ok ? c.Current : $"{c.Current} -> {c.Target}", EditorStyles.miniBoldLabel);
-                    EditorGUILayout.LabelField(c.Detail, EditorStyles.wordWrappedMiniLabel);
-                }
-                if (!c.Ok && c.Fix != null && GUILayout.Button(c.FixLabel, GUILayout.ExpandWidth(false), GUILayout.MinWidth(80), GUILayout.Height(24)))
-                    ApplyFixes(new[] { c });
+                var fix = new Button(() => ApplyFixes(new[] { c })) { text = c.FixLabel };
+                fix.AddToClassList("ff-button");
+                fix.style.minWidth = 80;
+                header.Add(fix);
             }
+            card.Add(header);
+
+            if (c.Current != null)
+            {
+                var value = new Label(c.Ok ? c.Current : $"{c.Current} -> {c.Target}");
+                value.AddToClassList("ffs-row-value");
+                card.Add(value);
+            }
+            var detail = new Label(c.Detail);
+            detail.AddToClassList("ff-hint");
+            card.Add(detail);
+            return card;
         }
 
         // one confirmation per click for anything that edits an asset the rest of the project shares
@@ -204,10 +274,9 @@ namespace Meowdieval.FoliageForge
             if (list.Count == 0) return;
             string shared = string.Join(", ", list.Where(c => c.SharedAsset != null).Select(c => c.SharedAsset).Distinct());
             if (shared.Length > 0 && !EditorUtility.DisplayDialog("Foliage Forge", $"This changes {shared}, which the rest of the project uses too. Each change is logged to the Console and can be undone with Edit > Undo.", "Apply", "Cancel"))
-                GUIUtility.ExitGUI();
+                return;
             foreach (SetupCheck c in list) c.Fix();
             Refresh();
-            GUIUtility.ExitGUI();
         }
     }
 

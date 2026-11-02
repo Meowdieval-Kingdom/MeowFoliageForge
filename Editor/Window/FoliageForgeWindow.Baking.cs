@@ -88,7 +88,7 @@ namespace Meowdieval.FoliageForge
                 _bakeButton.tooltip = (scratch ? "Asks where to save this scratch profile first. " : string.Empty)
                     + $"Bakes each enabled grass type as its own circular batch prefab in {TreeBaker.OutputFolder}/Grass/{(_grass != null ? _grass.name : "<profile>")}. Mix batches into tufts with the brush."
                     + (has ? " Batches exist already; edits made since the last bake are not tracked, so Overwrite shows either way." : string.Empty);
-                _bakeButton.style.backgroundColor = has ? new Color(0.7f, 0.42f, 0.1f) : new Color(0.2f, 0.45f, 0.3f);
+                SetBakeLook(has ? "overwrite" : "create");
                 return;
             }
             string prefabPath = _source != null ? $"{TreeBaker.OutputFolder}/{_source.name}/{_source.name}.prefab" : null;
@@ -97,13 +97,13 @@ namespace Meowdieval.FoliageForge
             {
                 _bakeButton.text = "Bake Prefab";
                 _bakeButton.tooltip = scratch ? "Asks where to save this scratch recipe, then creates its prefab." : "Creates the prefab for this recipe.";
-                _bakeButton.style.backgroundColor = new Color(0.2f, 0.45f, 0.3f);
+                SetBakeLook("create");
                 return;
             }
             bool changed = _recipe != null && JsonUtility.ToJson(_recipe) != JsonUtility.ToJson(_source);
             _bakeButton.text = changed ? "Overwrite Prefab  ●" : "Prefab Up To Date";
             _bakeButton.tooltip = changed ? $"Unsaved changes. Baking writes them into {AssetDatabase.GetAssetPath(_source)} and overwrites {prefabPath}, nothing else." : $"{prefabPath} matches this recipe.";
-            _bakeButton.style.backgroundColor = changed ? new Color(0.7f, 0.42f, 0.1f) : new Color(0.28f, 0.28f, 0.28f);
+            SetBakeLook(changed ? "overwrite" : "current");
         }
 
         private void SaveAsNew()

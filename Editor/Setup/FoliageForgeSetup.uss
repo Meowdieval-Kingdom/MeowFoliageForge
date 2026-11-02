@@ -1,0 +1,49 @@
+/* Setup wizard extras on top of the shared FoliageForge.uss (variables come from .ff-root). */
+
+.ffs-pill {
+    padding: 1px 8px;
+    margin-right: var(--ff-gap);
+    border-radius: 8px;
+    font-size: var(--ff-font-small);
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    color: rgb(255, 255, 255);
+    background-color: var(--ff-neutral);
+}
+
+.ffs-pill--ok { background-color: var(--ff-ok); }
+.ffs-pill--warn { background-color: var(--ff-warn); }
+.ffs-pill--bad { background-color: var(--ff-bad); }
+.ffs-pill--neutral { background-color: var(--ff-neutral); }
+
+.ffs-row-title {
+    -unity-font-style: bold;
+    font-size: var(--ff-font-body);
+    white-space: normal;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.ffs-row-value {
+    -unity-font-style: bold;
+    font-size: var(--ff-font-small);
+    white-space: normal;
+}
+
+.ffs-heading {
+    -unity-font-style: bold;
+    font-size: 14px;
+    margin-bottom: var(--ff-gap);
+}
+
+.ffs-footer {
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding-top: var(--ff-gap);
+}
+
+.ffs-footer > Button {
+    flex-grow: 1;
+    margin-right: var(--ff-gap);
+    margin-bottom: 2px;
+}

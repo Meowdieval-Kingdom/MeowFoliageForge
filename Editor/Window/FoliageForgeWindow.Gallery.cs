@@ -13,38 +13,52 @@ namespace Meowdieval.FoliageForge
     {
         private VisualElement BuildGallery()
         {
-            var box = new VisualElement
-            {
-                style =
-                {
-                    flexShrink = 0, backgroundColor = new Color(0.17f, 0.17f, 0.17f), borderTopWidth = 1, borderTopColor = new Color(0.1f, 0.1f, 0.1f),
-                    paddingLeft = 8, paddingRight = 8, paddingTop = 4, paddingBottom = 4,
-                },
-            };
-            var head = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center } };
-            _galleryTitle = new Label("Prefabs") { style = { unityFontStyleAndWeight = FontStyle.Bold, marginRight = 10 } };
-            _folderLabel = new Label { style = { opacity = 0.6f, flexGrow = 1, flexShrink = 1, overflow = Overflow.Hidden, textOverflow = TextOverflow.Ellipsis } };
+            var box = new VisualElement();
+            box.AddToClassList("ff-gallery");
+            VisualElement head = FoliageUi.WrapRow();
+            _galleryTitle = new Label("Prefabs");
+            _galleryTitle.AddToClassList("ff-title");
+            _folderLabel = new Label();
+            _folderLabel.AddToClassList("ff-muted");
+            _folderLabel.AddToClassList("ff-gallery__folder");
             head.Add(_galleryTitle);
             head.Add(FilterButton("All", 0));
             head.Add(FilterButton("Trees", 1));
             head.Add(FilterButton("Grass", 2));
             head.Add(_folderLabel);
-            _folderLabel.style.marginLeft = 8;
-            head.Add(new Button(ChooseOutputFolder) { text = "Folder...", tooltip = "Choose the folder bakes go into (inside Assets)." });
-            head.Add(new Button(() =>
+            head.Add(SmallButton("Folder...", ChooseOutputFolder, "Choose the folder bakes go into (inside Assets)."));
+            head.Add(SmallButton("Show", () =>
             {
                 Object folder = AssetDatabase.LoadAssetAtPath<Object>(TreeBaker.OutputFolder);
                 if (folder != null) EditorGUIUtility.PingObject(folder);
-            }) { text = "Show", tooltip = "Highlight the output folder in the Project window." });
+            }, "Highlight the output folder in the Project window."));
             box.Add(head);
-            _tiles = new ScrollView(ScrollViewMode.Horizontal) { style = { height = 134, marginTop = 4 } };
-            _tiles.contentContainer.style.flexDirection = FlexDirection.Row;
+
+            // thumbnail size toggle: tiles wrap and the size is a class on the tile container, so no refresh is needed
+            _tiles = new VisualElement();
+            _tiles.AddToClassList("ff-gallery__tiles");
+            Button small = null, medium = null;
+            void PaintSize()
+            {
+                FoliageUi.SetChipOn(small, _smallThumbs);
+                FoliageUi.SetChipOn(medium, !_smallThumbs);
+                _tiles.EnableInClassList("ff-gallery__tiles--small", _smallThumbs);
+            }
+            small = FoliageUi.ChipButton("Small", _smallThumbs, _ => { _smallThumbs = true; PaintSize(); }, "Small thumbnails.", false);
+            medium = FoliageUi.ChipButton("Medium", !_smallThumbs, _ => { _smallThumbs = false; PaintSize(); }, "Medium thumbnails.", false);
+            VisualElement sizeRow = FoliageUi.WrapRow();
+            sizeRow.Add(FoliageUi.GroupLabel("Thumbnails"));
+            sizeRow.Add(small);
+            sizeRow.Add(medium);
+            box.Add(sizeRow);
+            PaintSize();
             box.Add(_tiles);
-            _loadButton = new Button(LoadPicked) { text = "Load Selected Prefab", tooltip = "Open the picked prefab's recipe or grass profile here (switches tab). Double-clicking a tile does the same.", style = { marginTop = 4, alignSelf = Align.FlexStart } };
+
+            _loadButton = SmallButton("Load Selected Prefab", LoadPicked, "Open the picked prefab's recipe or grass profile here (switches tab). Double-clicking a tile does the same.");
             _loadButton.SetEnabled(false);
-            _deleteButton = new Button(DeletePicked) { text = "Delete", tooltip = "Move the picked prefab to the OS trash. Its recipe / grass profile is kept.", style = { marginTop = 4 } };
+            _deleteButton = SmallButton("Delete", DeletePicked, "Move the picked prefab to the OS trash. Its recipe / grass profile is kept.");
             _deleteButton.SetEnabled(false);
-            var actions = new VisualElement { style = { flexDirection = FlexDirection.Row } };
+            VisualElement actions = FoliageUi.WrapRow();
             actions.Add(_loadButton);
             actions.Add(_deleteButton);
             box.Add(actions);
@@ -66,21 +80,13 @@ namespace Meowdieval.FoliageForge
 
         private Button FilterButton(string text, int filter)
         {
-            var button = new Button(() =>
+            Button button = FoliageUi.ChipButton(text, _galleryFilter == filter, _ =>
             {
                 _galleryFilter = filter;
                 foreach (Action p in _filterPaint) p();
                 RefreshGallery();
-            })
-                { text = text, tooltip = $"Show {(filter == 0 ? "all baked prefabs" : filter == 1 ? "baked trees only" : "grass batches only")}.", style = { marginLeft = 0, marginRight = 0 } };
-            void Paint()
-            {
-                bool on = _galleryFilter == filter;
-                button.style.backgroundColor = on ? new StyleColor(new Color(0.2f, 0.4f, 0.62f)) : new StyleColor(StyleKeyword.Null);
-                button.style.unityFontStyleAndWeight = on ? FontStyle.Bold : FontStyle.Normal;
-            }
-            _filterPaint.Add(Paint);
-            Paint();
+            }, $"Show {(filter == 0 ? "all baked prefabs" : filter == 1 ? "baked trees only" : "grass batches only")}.", false);
+            _filterPaint.Add(() => FoliageUi.SetChipOn(button, _galleryFilter == filter));
             return button;
         }
 
@@ -118,19 +124,18 @@ namespace Meowdieval.FoliageForge
                 bool current = isGrass ? _grassMode && gb.Profile == _grass : !_grassMode && _recipe != null && _recipe.name == go.name;
                 var tile = new VisualElement
                 {
-                    tooltip = AssetDatabase.GetAssetPath(go) + "\nClick: pick it (white frame, bold name). Double-click or Load below: open it here." + (current ? "\nBlue with ●: what the editor is showing now." : string.Empty),
-                    style =
-                    {
-                        width = 104, marginRight = 6, paddingTop = 4, paddingBottom = 2, alignItems = Align.Center,
-                        backgroundColor = current ? new Color(0.2f, 0.4f, 0.62f) : new Color(0.23f, 0.23f, 0.23f),
-                        borderTopLeftRadius = 4, borderTopRightRadius = 4, borderBottomLeftRadius = 4, borderBottomRightRadius = 4,
-                        borderTopWidth = go == _picked ? 2 : 0, borderBottomWidth = go == _picked ? 2 : 0, borderLeftWidth = go == _picked ? 2 : 0, borderRightWidth = go == _picked ? 2 : 0,
-                        borderTopColor = Color.white, borderBottomColor = Color.white, borderLeftColor = Color.white, borderRightColor = Color.white,
-                    },
+                    tooltip = AssetDatabase.GetAssetPath(go) + "\nClick: pick it (framed, bold name). Double-click or Load below: open it here." + (current ? "\nBlue with ●: what the editor is showing now." : string.Empty),
                 };
-                var image = new Image { scaleMode = ScaleMode.ScaleToFit, style = { width = 96, height = 96, backgroundColor = new Color(0.14f, 0.16f, 0.15f) } };
+                tile.AddToClassList("ff-tile");
+                tile.EnableInClassList("ff-tile--current", current);
+                tile.EnableInClassList("ff-tile--picked", go == _picked);
+                var image = new Image { scaleMode = ScaleMode.ScaleToFit };
+                image.AddToClassList("ff-thumb");
                 tile.Add(image);
-                tile.Add(new Label(current ? "● " + go.name : go.name) { style = { fontSize = 11, marginTop = 2, maxWidth = 98, overflow = Overflow.Hidden, textOverflow = TextOverflow.Ellipsis, unityFontStyleAndWeight = go == _picked ? FontStyle.Bold : FontStyle.Normal } });
+                var nameLabel = new Label(current ? "● " + go.name : go.name);
+                nameLabel.AddToClassList("ff-tile__name");
+                nameLabel.EnableInClassList("ff-tile__name--picked", go == _picked);
+                tile.Add(nameLabel);
                 GameObject prefab = go;
                 tile.RegisterCallback<MouseDownEvent>(e =>
                 {
@@ -152,7 +157,10 @@ namespace Meowdieval.FoliageForge
             {
                 string empty = prefabs.Length == 0 ? "Nothing baked yet. Bake saves trees and grass batches into the folder above."
                     : _galleryFilter == 1 ? "No baked trees yet. Bake one in the Trees tab." : "No grass batches yet. Bake them in the Grass tab.";
-                _tiles.Add(new Label(empty) { style = { opacity = 0.75f, marginTop = 20, marginLeft = 4 } });
+                var emptyLabel = new Label(empty);
+                emptyLabel.AddToClassList("ff-muted");
+                emptyLabel.AddToClassList("ff-empty");
+                _tiles.Add(emptyLabel);
                 return;
             }
             // thumbnails render asynchronously; keep asking until each one is ready

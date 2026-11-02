@@ -126,30 +126,14 @@ namespace Meowdieval.FoliageForge
             _statsBar.Clear();
             BudgetSettings budget = _recipe.Budget;
             bool heavy = _stats.Triangles > budget.MaxTriangles;
-            _statsBar.Add(Chip("Triangles", _stats.Triangles.ToString("N0"), heavy ? Warn : Ok));
-            _statsBar.Add(Chip("Cards", _stats.Cards.ToString("N0") + (_stats.CardsDropped > 0 ? $"  (-{_stats.CardsDropped} capped)" : string.Empty), _stats.CardsDropped > 0 ? Warn : Ok));
-            _statsBar.Add(Chip("Vertices", _stats.Vertices.ToString("N0"), Neutral));
-            _statsBar.Add(Chip("Draw calls", "2", Ok));
-            _statsBar.Add(Chip("Mesh", $"{_stats.MeshBytes / 1024f:0.#} KB", Neutral));
-            _statsBar.Add(Chip("Size", $"{_stats.Size.x:0.0} x {_stats.Size.y:0.0} x {_stats.Size.z:0.0} m", Neutral));
+            _statsBar.Add(FoliageUi.StatChip("Triangles", _stats.Triangles.ToString("N0"), heavy ? StatKind.Warn : StatKind.Ok));
+            _statsBar.Add(FoliageUi.StatChip("Cards", _stats.Cards.ToString("N0") + (_stats.CardsDropped > 0 ? $"  (-{_stats.CardsDropped} capped)" : string.Empty), _stats.CardsDropped > 0 ? StatKind.Warn : StatKind.Ok));
+            _statsBar.Add(FoliageUi.StatChip("Vertices", _stats.Vertices.ToString("N0")));
+            _statsBar.Add(FoliageUi.StatChip("Draw calls", "2", StatKind.Ok));
+            _statsBar.Add(FoliageUi.StatChip("Mesh", $"{_stats.MeshBytes / 1024f:0.#} KB"));
+            _statsBar.Add(FoliageUi.StatChip("Size", $"{_stats.Size.x:0.0} x {_stats.Size.y:0.0} x {_stats.Size.z:0.0} m"));
             if (_status != null && heavy) _status.text = $"Over the {budget.MaxTriangles:N0} triangle budget. Lower branch count or radial sides, or turn on Fit Cards To Triangles.";
             else if (_status != null && _status.text.StartsWith("Over the")) _status.text = string.Empty;
-        }
-
-        private static VisualElement Chip(string label, string value, Color color)
-        {
-            var chip = new VisualElement
-            {
-                style =
-                {
-                    flexDirection = FlexDirection.Row, backgroundColor = color, marginRight = 6, marginBottom = 4,
-                    paddingLeft = 8, paddingRight = 8, paddingTop = 2, paddingBottom = 2,
-                    borderTopLeftRadius = 3, borderTopRightRadius = 3, borderBottomLeftRadius = 3, borderBottomRightRadius = 3,
-                },
-            };
-            chip.Add(new Label(label) { style = { opacity = 0.7f, marginRight = 6, color = Color.white } });
-            chip.Add(new Label(value) { style = { unityFontStyleAndWeight = FontStyle.Bold, color = Color.white } });
-            return chip;
         }
     }
 }

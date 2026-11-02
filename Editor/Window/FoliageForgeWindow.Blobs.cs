@@ -11,31 +11,6 @@ namespace Meowdieval.FoliageForge
 {
     public sealed partial class FoliageForgeWindow
     {
-        private VisualElement ModeButton(string text, PreviewMode mode, string tooltip)
-        {
-            var accent = new Color(0.2f, 0.4f, 0.62f);
-            var idle = new Color(0.3f, 0.3f, 0.3f);
-            var button = new Button { text = text, tooltip = tooltip };
-            button.style.height = 32;
-            button.style.minWidth = 76;
-            button.style.marginTop = button.style.marginBottom = 2;
-            button.style.marginRight = 4;
-            button.style.marginLeft = 0;
-            button.style.fontSize = 13;
-            button.style.unityFontStyleAndWeight = FontStyle.Bold;
-            button.style.borderTopLeftRadius = button.style.borderTopRightRadius = button.style.borderBottomLeftRadius = button.style.borderBottomRightRadius = 4;
-            void Paint()
-            {
-                bool on = _preview.Mode == mode;
-                button.style.backgroundColor = on ? accent : idle;
-                button.style.color = on ? Color.white : new Color(0.8f, 0.8f, 0.8f);
-            }
-            button.clicked += () => SetMode(mode);
-            _modePaint.Add(Paint);
-            Paint();
-            return button;
-        }
-
         // the blob panel serves both blob modes: editing the set (Blobs) and viewing one blob alone (Blob)
         bool InBlobPanelMode => _preview.Mode == PreviewMode.Blobs || _preview.Mode == PreviewMode.Blob;
 
@@ -78,12 +53,14 @@ namespace Meowdieval.FoliageForge
         Vector3Field _positionField, _radiiField, _rotationField;
         VisualElement _blobSelected;
 
-        private static VisualElement BlobRow() => new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, flexWrap = Wrap.Wrap } };
+        private static VisualElement BlobRow() => FoliageUi.WrapRow();
 
         // a Vector3 field that writes one property of the selected blob, undoably
         private Vector3Field BlobVector(string label, string tooltip, System.Action<CanopyBlobRef, Vector3> set)
         {
-            var field = new Vector3Field(label) { tooltip = tooltip, style = { minWidth = 260, marginRight = 8 } };
+            var field = new Vector3Field(label) { tooltip = tooltip };
+            field.AddToClassList("ff-vector");
+            field.labelElement.AddToClassList("ff-input-label");
             field.RegisterValueChangedCallback(e =>
             {
                 if (_recipe == null || _preview.Selected < 0 || _preview.Selected >= _recipe.Blobs.Count) return;
@@ -156,15 +133,6 @@ namespace Meowdieval.FoliageForge
 
         // quick-iteration roll: settings live in the window, not the recipe
         float _randCount = 7, _randSize = 0.9f, _randSpread = 0.8f, _randFlat = 0.75f;
-
-        private Slider RandomSlider(string label, float min, float max, float value, Action<float> onChange)
-        {
-            Slider s = WindSlider(label, min, max, value, onChange);
-            s.style.flexBasis = StyleKeyword.Auto;
-            s.style.flexGrow = 0;
-            s.style.width = 190;
-            return s;
-        }
 
         private void RandomizeBlobs()
         {

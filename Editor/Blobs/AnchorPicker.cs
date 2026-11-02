@@ -7,7 +7,8 @@ namespace Meowdieval.FoliageForge
     /// <summary>Shows the leaf texture's opaque part with a dot at the anchor; click or drag to move where the leaf attaches to the branch.</summary>
     public sealed class AnchorPicker : VisualElement
     {
-        const float Box = 150f;
+        const float MinBox = 110f, MaxBox = 180f;
+        float _box = 150f; // square side, follows the available width within MinBox..MaxBox
         readonly SerializedObject _so;
         readonly SerializedProperty _anchor, _texture, _columns, _rows;
         readonly Image _image = new Image { scaleMode = ScaleMode.StretchToFill };
@@ -26,9 +27,14 @@ namespace Meowdieval.FoliageForge
             style.marginTop = 2;
             style.marginBottom = 4;
             style.marginLeft = 4;
-            style.width = Box;
-            style.height = Box;
-            style.backgroundColor = new Color(0.12f, 0.12f, 0.12f);
+            FoliageUi.Apply(this);
+            AddToClassList("ff-panel"); // shared background/border variables
+            style.paddingTop = style.paddingBottom = style.paddingLeft = style.paddingRight = 0;
+            style.width = new Length(100f, LengthUnit.Percent);
+            style.minWidth = MinBox;
+            style.maxWidth = MaxBox;
+            style.height = _box;
+            style.alignSelf = Align.FlexStart;
             style.alignItems = Align.Center;
             style.justifyContent = Justify.Center;
 
@@ -53,6 +59,15 @@ namespace Meowdieval.FoliageForge
                 if (_image.HasPointerCapture(e.pointerId)) Set(e.localPosition);
             });
             _image.RegisterCallback<PointerUpEvent>(e => _image.ReleasePointer(e.pointerId));
+            RegisterCallback<GeometryChangedEvent>(e =>
+            {
+                float box = Mathf.Clamp(e.newRect.width, MinBox, MaxBox);
+                if (Mathf.Abs(box - _box) < 0.5f) return;
+                _box = box;
+                style.height = box;
+                _shownGrid = new Vector2Int(-1, -1); // force the image to resize
+                Refresh();
+            });
             schedule.Execute(Refresh).Every(250);
             Refresh();
         }
@@ -81,8 +96,9 @@ namespace Meowdieval.FoliageForge
                 float aspect = content.height / Mathf.Max(content.width, 1e-3f);
                 _image.image = drawn;
                 _image.uv = content;
-                _image.style.width = aspect > 1f ? Box / aspect : Box;
-                _image.style.height = aspect > 1f ? Box : Box * aspect;
+                float side = _box - 2f; // inside the 1px panel border
+                _image.style.width = aspect > 1f ? side / aspect : side;
+                _image.style.height = aspect > 1f ? side : side * aspect;
             }
             Vector2 a = _anchor.vector2Value;
             _dot.style.left = a.x * _image.resolvedStyle.width - 6f;

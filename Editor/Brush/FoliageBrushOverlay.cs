@@ -14,7 +14,26 @@ namespace Meowdieval.FoliageForge
         /// <summary>Overlay id.</summary>
         public const string Id = "meowdieval-foliage-brush";
 
-        static readonly Color Active = new Color(0.24f, 0.48f, 0.78f);
+        const string TileSizeKey = "FoliageForge.BrushTileSize";
+        // thumbnail edge in px for the Small / Medium / Large tile chips
+        static readonly int[] TileThumbs = { 40, 56, 80 };
+        static readonly string[] TileNames = { "Small", "Medium", "Large" };
+        static int _tileSize = -1;
+        readonly Button[] _tileChips = new Button[3];
+
+        static int TileSize
+        {
+            get
+            {
+                if (_tileSize < 0) _tileSize = Mathf.Clamp(EditorPrefs.GetInt(TileSizeKey, 1), 0, TileThumbs.Length - 1);
+                return _tileSize;
+            }
+            set
+            {
+                _tileSize = Mathf.Clamp(value, 0, TileThumbs.Length - 1);
+                EditorPrefs.SetInt(TileSizeKey, _tileSize);
+            }
+        }
 
         Label _target, _stats, _paletteMix, _grassMix;
         Button _select, _create, _paint, _erase, _off, _grassTarget, _propsTarget, _addLayer;
@@ -44,7 +63,12 @@ namespace Meowdieval.FoliageForge
         }
 
         /// <summary>Subscribes to project changes so new bakes show up.</summary>
-        public override void OnCreated() => EditorApplication.projectChanged += RebuildPalette;
+        public override void OnCreated()
+        {
+            minSize = new Vector2(260f, 120f); // lets the panel be resized wider
+            maxSize = new Vector2(720f, 4000f);
+            EditorApplication.projectChanged += RebuildPalette;
+        }
 
         /// <summary>Unsubscribes.</summary>
         public override void OnWillBeDestroyed() => EditorApplication.projectChanged -= RebuildPalette;
@@ -52,21 +76,26 @@ namespace Meowdieval.FoliageForge
         /// <summary>Builds the panel; all state lives in <see cref="FoliageBrush"/>, so a rebuild loses nothing.</summary>
         public override VisualElement CreatePanelContent()
         {
-            var root = new VisualElement { style = { width = 270 } };
+            var root = new VisualElement { style = { minWidth = 260, flexGrow = 1 } };
+            FoliageUi.Apply(root); // the shared sheet only reaches elements below a root that called Apply (idempotent)
 
             VisualElement head = Row(root);
             _target = new Label { style = { flexGrow = 1, unityFontStyleAndWeight = FontStyle.Bold, unityTextAlign = TextAnchor.MiddleLeft, overflow = Overflow.Hidden } };
             head.Add(_target);
             _select = new Button(SelectTarget) { text = "Select", tooltip = "Select the Foliage Forge the brush paints into." };
+            _select.AddToClassList("ff-button");
             head.Add(_select);
             _create = new Button(() =>
             {
                 FoliageForgeManagerEditor.CreateInScene(null);
                 FoliageBrush.Invalidate();
             }) { text = "Create Foliage Forge", tooltip = "Adds a Foliage Forge (manager, Grass Field, Props root) to the open scene." };
+            _create.AddToClassList("ff-button");
+            _create.AddToClassList("ff-button--primary");
             root.Add(_create);
 
-            VisualElement modes = Row(root);
+            VisualElement modes = FoliageUi.WrapRow();
+            root.Add(modes);
             _paint = ModeButton(modes, "Paint", "Left-drag in the scene view paints. Hold Shift to erase instead.", () =>
             {
                 FoliageBrush.Erase = false;
@@ -85,7 +114,8 @@ namespace Meowdieval.FoliageForge
                 Refresh();
             });
 
-            VisualElement targets = Row(root);
+            VisualElement targets = FoliageUi.WrapRow();
+            root.Add(targets);
             _grassTarget = ModeButton(targets, "Grass paint", "Paint grass strokes on the Grass Field with its Grass Profile. Grass appears when you release the mouse.", () => SetTarget(BrushTarget.Grass));
             _propsTarget = ModeButton(targets, "Prefabs", "Place the palette prefabs (baked trees and grass batches) under the Props root.", () => SetTarget(BrushTarget.Props));
 
@@ -136,14 +166,14 @@ namespace Meowdieval.FoliageForge
             });
 
             VisualElement scale = Row(_props);
-            var min = new FloatField("Scale") { value = FoliageBrush.Scale.x, tooltip = "Random scale range: min, max.", style = { flexGrow = 1 } };
+            var min = new FloatField("Scale") { value = FoliageBrush.Scale.x, tooltip = "Random scale range: min, max.", style = { flexGrow = 2, flexBasis = 0 } };
             Narrow(min.labelElement);
             min.RegisterValueChangedCallback(e =>
             {
                 FoliageBrush.Scale.x = Mathf.Max(0.01f, e.newValue);
                 FoliageBrush.Save();
             });
-            var max = new FloatField { value = FoliageBrush.Scale.y, tooltip = "Random scale range: min, max.", style = { width = 60 } };
+            var max = new FloatField { value = FoliageBrush.Scale.y, tooltip = "Random scale range: min, max.", style = { flexGrow = 1, flexBasis = 0, minWidth = 56 } };
             max.RegisterValueChangedCallback(e =>
             {
                 FoliageBrush.Scale.y = Mathf.Max(0.01f, e.newValue);
@@ -174,14 +204,14 @@ namespace Meowdieval.FoliageForge
             });
             _rotation.Add(axes);
             VisualElement amount = Row(_rotation);
-            var rmin = new FloatField("Amount") { value = FoliageBrush.RotationRange.x, tooltip = "Random rotation in degrees: min, max.", style = { flexGrow = 1 } };
+            var rmin = new FloatField("Amount") { value = FoliageBrush.RotationRange.x, tooltip = "Random rotation in degrees: min, max.", style = { flexGrow = 2, flexBasis = 0 } };
             Narrow(rmin.labelElement);
             rmin.RegisterValueChangedCallback(e =>
             {
                 FoliageBrush.RotationRange.x = e.newValue;
                 FoliageBrush.Save();
             });
-            var rmax = new FloatField { value = FoliageBrush.RotationRange.y, tooltip = "Random rotation in degrees: min, max.", style = { width = 60 } };
+            var rmax = new FloatField { value = FoliageBrush.RotationRange.y, tooltip = "Random rotation in degrees: min, max.", style = { flexGrow = 1, flexBasis = 0, minWidth = 56 } };
             rmax.RegisterValueChangedCallback(e =>
             {
                 FoliageBrush.RotationRange.y = e.newValue;
@@ -197,11 +227,33 @@ namespace Meowdieval.FoliageForge
                 Show(_rotation, e.newValue);
             });
 
-            VisualElement paletteHead = Row(_props);
-            paletteHead.Add(new Label("Palette (click to toggle)") { style = { flexGrow = 1, unityFontStyleAndWeight = FontStyle.Bold, unityTextAlign = TextAnchor.MiddleLeft } });
-            paletteHead.Add(new Button(AddSelected) { text = "+ Selected", tooltip = "Add the prefabs selected in the Project window." });
-            paletteHead.Add(new Button(() => FoliageForgeWindow.Open()) { text = "Bake...", tooltip = "Open the Foliage Forge Editor to bake trees and grass batches." });
-            _paletteMix = new Label { tooltip = "Share of placements each ticked prefab gets, from the Mix % under its thumbnail.", style = { opacity = 0.8f, whiteSpace = WhiteSpace.Normal } };
+            VisualElement paletteHead = FoliageUi.WrapRow();
+            _props.Add(paletteHead);
+            var paletteTitle = FoliageUi.GroupLabel("Palette (click to toggle)");
+            paletteTitle.style.flexGrow = 1;
+            paletteHead.Add(paletteTitle);
+            var addSelected = new Button(AddSelected) { text = "+ Selected", tooltip = "Add the prefabs selected in the Project window." };
+            addSelected.AddToClassList("ff-button");
+            paletteHead.Add(addSelected);
+            var bake = new Button(() => FoliageForgeWindow.Open()) { text = "Bake...", tooltip = "Open the Foliage Forge Editor to bake trees and grass batches." };
+            bake.AddToClassList("ff-button");
+            paletteHead.Add(bake);
+            VisualElement tileRow = FoliageUi.WrapRow();
+            tileRow.Add(FoliageUi.GroupLabel("Tile size", "Size of the palette thumbnails."));
+            for (int i = 0; i < TileNames.Length; i++)
+            {
+                int size = i;
+                _tileChips[i] = FoliageUi.ChipButton(TileNames[i], TileSize == i, _ =>
+                {
+                    TileSize = size;
+                    for (int k = 0; k < _tileChips.Length; k++) FoliageUi.SetChipOn(_tileChips[k], k == size);
+                    RebuildPalette();
+                }, null, false);
+                tileRow.Add(_tileChips[i]);
+            }
+            _props.Add(tileRow);
+            _paletteMix = new Label { tooltip = "Share of placements each ticked prefab gets, from the Mix % under its thumbnail.", style = { whiteSpace = WhiteSpace.Normal } };
+            _paletteMix.AddToClassList("ff-muted");
             _props.Add(_paletteMix);
             var scroll = new ScrollView { style = { maxHeight = 280 } };
             _palette = new VisualElement();
@@ -215,10 +267,12 @@ namespace Meowdieval.FoliageForge
             _ground.RegisterValueChangedCallback(e => FoliageBrush.SetGroundMask(e.newValue));
             root.Add(_ground);
             _addLayer = new Button(() => FoliageBrush.SetGroundMask(FoliageBrush.GroundMask | 1 << FoliageBrush.CursorLayer));
+            _addLayer.AddToClassList("ff-button");
             root.Add(_addLayer);
             _status = new HelpBox();
             root.Add(_status);
-            _stats = new Label { style = { opacity = 0.7f, fontSize = 10 } };
+            _stats = new Label();
+            _stats.AddToClassList("ff-muted");
             root.Add(_stats);
 
             root.schedule.Execute(Refresh).Every(200);
@@ -313,7 +367,7 @@ namespace Meowdieval.FoliageForge
             _typesFor = p;
             _typesKey = key;
             if (p == null || p.Variants == null) return;
-            _grassTypes.Add(new Label($"Grass types ({p.name})") { style = { unityFontStyleAndWeight = FontStyle.Bold, marginTop = 4, marginBottom = 2 } });
+            _grassTypes.Add(FoliageUi.GroupLabel($"Grass types ({p.name})"));
             for (int i = 0; i < p.Variants.Length; i++)
             {
                 int index = i;
@@ -327,9 +381,12 @@ namespace Meowdieval.FoliageForge
                 row.Add(mix);
                 _typeRows.Add((on, mix));
             }
-            _grassMix = new Label { style = { opacity = 0.8f, whiteSpace = WhiteSpace.Normal } };
+            _grassMix = new Label { style = { whiteSpace = WhiteSpace.Normal } };
+            _grassMix.AddToClassList("ff-muted");
             _grassTypes.Add(_grassMix);
-            _grassTypes.Add(new Label("These edit the Grass Profile: every stroke and fill using it re-blends.") { style = { opacity = 0.6f, fontSize = 10, whiteSpace = WhiteSpace.Normal } });
+            var grassHint = new Label("These edit the Grass Profile: every stroke and fill using it re-blends.");
+            grassHint.AddToClassList("ff-hint");
+            _grassTypes.Add(grassHint);
         }
 
         private void EditType(GrassProfile p, int index, System.Action<GrassVariant> edit)
@@ -395,10 +452,12 @@ namespace Meowdieval.FoliageForge
 
         private void Section(string title, List<GameObject> prefabs, string empty)
         {
-            _palette.Add(new Label($"{title} ({prefabs.Count})") { style = { unityFontStyleAndWeight = FontStyle.Bold, marginTop = 4, marginBottom = 2 } });
+            _palette.Add(FoliageUi.GroupLabel($"{title} ({prefabs.Count})"));
             if (prefabs.Count == 0)
             {
-                _palette.Add(new Label(empty) { style = { opacity = 0.6f, whiteSpace = WhiteSpace.Normal } });
+                var emptyLabel = new Label(empty) { style = { whiteSpace = WhiteSpace.Normal } };
+                emptyLabel.AddToClassList("ff-muted");
+                _palette.Add(emptyLabel);
                 return;
             }
             var grid = new VisualElement { style = { flexDirection = FlexDirection.Row, flexWrap = Wrap.Wrap } };
@@ -408,21 +467,22 @@ namespace Meowdieval.FoliageForge
 
         private VisualElement Tile(GameObject prefab)
         {
+            int thumb = TileThumbs[TileSize];
             var tile = new VisualElement
             {
                 tooltip = $"{prefab.name}\n{AssetDatabase.GetAssetPath(prefab)}\nClick to add to or remove from the palette.",
                 style =
                 {
-                    width = 60, marginRight = 3, marginBottom = 3, paddingTop = 2, paddingBottom = 2, alignItems = Align.Center,
-                    borderTopLeftRadius = 4, borderTopRightRadius = 4, borderBottomLeftRadius = 4, borderBottomRightRadius = 4,
-                    borderTopWidth = 2, borderBottomWidth = 2, borderLeftWidth = 2, borderRightWidth = 2,
+                    width = thumb + 10, height = StyleKeyword.Auto, minWidth = 0, marginRight = 3, marginBottom = 3, paddingTop = 3, paddingBottom = 3, paddingLeft = 2, paddingRight = 2,
+                    alignItems = Align.Center,
                 },
             };
+            tile.AddToClassList("ff-chip"); // shared idle / hover look; ff-chip--on (accent) marks palette members, see MarkTile
             Texture2D preview = PrefabThumbnail.Get(prefab);
-            var image = new Image { image = preview != null ? preview : AssetPreview.GetMiniThumbnail(prefab), scaleMode = ScaleMode.ScaleToFit, style = { width = 52, height = 52 } };
+            var image = new Image { image = preview != null ? preview : AssetPreview.GetMiniThumbnail(prefab), scaleMode = ScaleMode.ScaleToFit, style = { width = thumb, height = thumb } };
             if (preview == null) _pending.Add((image, prefab));
             tile.Add(image);
-            tile.Add(new Label(prefab.name) { style = { fontSize = 9, maxWidth = 56, overflow = Overflow.Hidden, textOverflow = TextOverflow.Ellipsis, whiteSpace = WhiteSpace.NoWrap } });
+            tile.Add(new Label(prefab.name) { style = { fontSize = 11, maxWidth = thumb + 6, overflow = Overflow.Hidden, textOverflow = TextOverflow.Ellipsis, whiteSpace = WhiteSpace.NoWrap, unityFontStyleAndWeight = FontStyle.Normal } });
             tile.RegisterCallback<ClickEvent>(e =>
             {
                 FoliageForgeManager m = FoliageBrush.Manager;
@@ -430,7 +490,7 @@ namespace Meowdieval.FoliageForge
                 FoliageBrush.SetInPalette(m, new[] { prefab }, !m.Palette.Contains(prefab));
                 Refresh();
             });
-            var mix = new IntegerField { isDelayed = true, tooltip = "Mix % (0..100): how often the brush picks this prefab next to the other ticked ones. 0 = never.", style = { width = 52 } };
+            var mix = new IntegerField { isDelayed = true, tooltip = "Mix % (0..100): how often the brush picks this prefab next to the other ticked ones. 0 = never.", style = { width = thumb } };
             mix.RegisterCallback<ClickEvent>(e => e.StopPropagation()); // typing must not toggle the tile
             mix.RegisterValueChangedCallback(e =>
             {
@@ -443,16 +503,7 @@ namespace Meowdieval.FoliageForge
             return tile;
         }
 
-        private static void MarkTile(VisualElement tile, bool on)
-        {
-            tile.style.backgroundColor = on ? Active : new Color(0.2f, 0.2f, 0.2f);
-            tile.style.opacity = on ? 1f : 0.55f;
-            Color border = on ? Color.white : Color.clear;
-            tile.style.borderTopColor = border;
-            tile.style.borderBottomColor = border;
-            tile.style.borderLeftColor = border;
-            tile.style.borderRightColor = border;
-        }
+        private static void MarkTile(VisualElement tile, bool on) => FoliageUi.SetChipOn(tile, on);
 
         private void SetTarget(BrushTarget target)
         {
@@ -486,23 +537,25 @@ namespace Meowdieval.FoliageForge
 
         private static Button ModeButton(VisualElement row, string text, string tooltip, System.Action click)
         {
-            var button = new Button(click) { text = text, tooltip = tooltip, style = { flexGrow = 1, flexBasis = 0 } };
+            Button button = FoliageUi.ChipButton(text, false, _ => click(), tooltip, false);
+            button.style.flexGrow = 1;
+            button.style.flexBasis = 0;
             row.Add(button);
             return button;
         }
 
-        private static void Mark(Button button, bool on)
-        {
-            button.style.backgroundColor = on ? new StyleColor(Active) : new StyleColor(StyleKeyword.Null);
-            button.style.unityFontStyleAndWeight = on ? FontStyle.Bold : FontStyle.Normal;
-        }
+        private static void Mark(Button button, bool on) => FoliageUi.SetChipOn(button, on);
 
         private static void Show(VisualElement element, bool on) => element.style.display = on ? DisplayStyle.Flex : DisplayStyle.None;
 
         private static void Narrow(Label label)
         {
-            label.style.minWidth = 84;
-            label.style.width = 84;
+            // same label column as .ff-field: at least 110px, ~40%, wraps instead of clipping
+            label.style.minWidth = 110;
+            label.style.width = new Length(40f, LengthUnit.Percent);
+            label.style.flexShrink = 0;
+            label.style.whiteSpace = WhiteSpace.Normal;
+            label.style.overflow = Overflow.Visible;
         }
 
         private static Slider AddSlider(VisualElement parent, string label, string tooltip, float min, float max, float value, System.Action<float> set)

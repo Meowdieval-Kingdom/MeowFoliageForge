@@ -90,29 +90,67 @@ namespace Meowdieval.FoliageForge
         /// </summary>
         public static VisualElement CreateInset(TreeRecipe recipe) => new Inset(recipe);
 
-        // the toolbar sits at the top of the preview rect
-        internal static Rect ToolbarRect(Rect view) => new Rect(view.x + 4f, view.y + 4f, Mathf.Min(view.width - 8f, 430f), 20f);
+        const float ButtonHeight = 24f, BarPad = 6f, BarSpace = 4f, BarMaxWidth = 460f;
+        static readonly float[] ButtonWidths = { 216f, 62f, 72f, 72f }; // display toggle group (3 segments), Cage, Sphere, Arrows
+        static readonly Rect[] Slots = new Rect[4];
+        static string _lastSummary = string.Empty;
+        static GUIStyle _buttonStyle, _summaryStyle;
+
+        // the toolbar sits at the top of the preview rect; its height follows the wrapped rows and summary text
+        internal static Rect ToolbarRect(Rect view) => Layout(view, _lastSummary);
+
+        // flows the buttons into rows that fit view.width, then the word-wrapped summary below; fills Slots, returns the backdrop rect
+        private static Rect Layout(Rect view, string summary)
+        {
+            EnsureStyles();
+            float width = Mathf.Max(Mathf.Min(view.width - 8f, BarMaxWidth), 60f);
+            float inner = width - 2f * BarPad;
+            float x = 0f, y = 0f;
+            for (int i = 0; i < ButtonWidths.Length; i++)
+            {
+                float w = Mathf.Min(ButtonWidths[i], inner);
+                if (x > 0f && x + w > inner)
+                {
+                    x = 0f;
+                    y += ButtonHeight + BarSpace;
+                }
+                Slots[i] = new Rect(view.x + 4f + BarPad + x, view.y + 4f + BarPad + y, w, ButtonHeight);
+                x += w + BarSpace;
+            }
+            float height = 2f * BarPad + y + ButtonHeight;
+            if (!string.IsNullOrEmpty(summary)) height += BarSpace + _summaryStyle.CalcHeight(new GUIContent(summary), inner);
+            return new Rect(view.x + 4f, view.y + 4f, width, height);
+        }
+
+        private static void EnsureStyles()
+        {
+            if (_buttonStyle == null)
+            {
+                _buttonStyle = new GUIStyle(EditorStyles.miniButton) { fontSize = 11, alignment = TextAnchor.MiddleCenter, fixedHeight = 0f };
+                _summaryStyle = new GUIStyle(EditorStyles.label) { fontSize = 11, wordWrap = true };
+                _summaryStyle.normal.textColor = Color.white;
+            }
+        }
 
         /// <summary>Draws the display and overlay toolbar plus <paramref name="summary"/> over the preview; call after drawing it.</summary>
         internal static void DrawToolbar(Rect view, TreePreview preview, string summary)
         {
-            Rect bar = ToolbarRect(view);
-            EditorGUI.DrawRect(new Rect(bar.x - 2f, bar.y - 2f, bar.width + 4f, bar.height + 22f), new Color(0.1f, 0.1f, 0.1f, 0.6f));
-            var shown = new Rect(bar.x, bar.y, 190f, bar.height);
-            preview.Display = (BlobDisplay)GUI.Toolbar(shown, (int)preview.Display, DisplayNames, EditorStyles.miniButton);
-            float x = shown.xMax + 6f;
-            preview.ShowCage = GUI.Toggle(new Rect(x, bar.y, 50f, bar.height), preview.ShowCage, "Cage", EditorStyles.miniButton);
-            preview.ShowReference = GUI.Toggle(new Rect(x + 52f, bar.y, 58f, bar.height), preview.ShowReference, "Sphere", EditorStyles.miniButton);
-            preview.ShowNormalArrows = GUI.Toggle(new Rect(x + 112f, bar.y, 60f, bar.height), preview.ShowNormalArrows, "Arrows", EditorStyles.miniButton);
-            if (_summaryStyle == null)
+            summary ??= string.Empty;
+            _lastSummary = summary;
+            Rect bar = Layout(view, summary);
+            EditorGUI.DrawRect(bar, new Color(0.05f, 0.05f, 0.06f, 0.88f));
+            preview.Display = (BlobDisplay)GUI.Toolbar(Slots[0], (int)preview.Display, DisplayNames, _buttonStyle);
+            preview.ShowCage = GUI.Toggle(Slots[1], preview.ShowCage, "Cage", _buttonStyle);
+            preview.ShowReference = GUI.Toggle(Slots[2], preview.ShowReference, "Sphere", _buttonStyle);
+            preview.ShowNormalArrows = GUI.Toggle(Slots[3], preview.ShowNormalArrows, "Arrows", _buttonStyle);
+            if (summary.Length > 0)
             {
-                _summaryStyle = new GUIStyle(EditorStyles.miniLabel);
-                _summaryStyle.normal.textColor = Color.white;
+                float top = Slots[0].y;
+                for (int i = 1; i < Slots.Length; i++) top = Mathf.Max(top, Slots[i].y);
+                float inner = bar.width - 2f * BarPad;
+                GUI.Label(new Rect(bar.x + BarPad, top + ButtonHeight + BarSpace, inner, bar.yMax - BarPad - (top + ButtonHeight + BarSpace)), summary, _summaryStyle);
             }
-            GUI.Label(new Rect(bar.x, bar.y + 21f, bar.width, 18f), summary, _summaryStyle);
         }
-
-        static GUIStyle _summaryStyle;
 
         // inspector element: label, then an orbit view of the preferred blob that follows the recipe
         sealed class Inset : VisualElement
@@ -133,8 +171,12 @@ namespace Meowdieval.FoliageForge
                 _recipe = recipe;
                 style.flexShrink = 0;
                 style.marginTop = 4;
-                Add(new Label("Single blob. Leaf settings are global: every blob uses the same ones.") { style = { opacity = 0.75f, whiteSpace = WhiteSpace.Normal } });
-                _view = new IMGUIContainer(Draw) { style = { height = 240, marginTop = 2 } };
+                FoliageUi.Apply(this);
+                var hint = new Label("Single blob. Leaf settings are global: every blob uses the same ones.");
+                hint.AddToClassList("ff-hint");
+                Add(hint);
+                // flexible: prefers 240px, shrinks to 200px in a cramped inspector, grows when the parent gives it room
+                _view = new IMGUIContainer(Draw) { style = { flexBasis = 240, flexGrow = 1, flexShrink = 1, minHeight = 200, marginTop = 2 } };
                 Add(_view);
                 RegisterCallback<AttachToPanelEvent>(_ =>
                 {

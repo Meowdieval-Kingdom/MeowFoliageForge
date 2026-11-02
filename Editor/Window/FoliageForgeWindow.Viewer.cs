@@ -14,19 +14,18 @@ namespace Meowdieval.FoliageForge
         private VisualElement BuildViewerRow()
         {
             VisualElement row = BlobRow();
-            row.style.marginTop = 4;
-            row.style.paddingTop = 4;
-            row.style.borderTopWidth = 1;
-            row.style.borderTopColor = new Color(0.4f, 0.4f, 0.4f);
-            row.Add(new Label("Blob viewer") { style = { unityFontStyleAndWeight = FontStyle.Bold, marginRight = 8 } });
+            row.AddToClassList("ff-divider");
+            row.Add(Title("Blob viewer"));
             _viewerToggle = new Button(() => SetMode(_preview.Mode == PreviewMode.Blob ? PreviewMode.Blobs : PreviewMode.Blob));
+            _viewerToggle.AddToClassList("ff-button");
             row.Add(_viewerToggle);
 
             _viewerNav = BlobRow();
-            _viewerNavLabel = new Label { style = { marginLeft = 6, marginRight = 6 } };
-            _viewerNav.Add(new Button(() => StepViewedBlob(-1)) { text = "<", tooltip = "Previous blob." });
+            _viewerNavLabel = new Label();
+            _viewerNavLabel.AddToClassList("ff-muted");
+            _viewerNav.Add(SmallButton("<", () => StepViewedBlob(-1), "Previous blob."));
             _viewerNav.Add(_viewerNavLabel);
-            _viewerNav.Add(new Button(() => StepViewedBlob(1)) { text = ">", tooltip = "Next blob." });
+            _viewerNav.Add(SmallButton(">", () => StepViewedBlob(1), "Next blob."));
             row.Add(_viewerNav);
 
             row.Add(ViewerInt("Groups", "Leaf groups in each blob (Cards Per Blob).", 0, 400, l => l.CardsPerBlob, (l, v) => l.CardsPerBlob = v));
@@ -38,7 +37,9 @@ namespace Meowdieval.FoliageForge
             row.Add(ViewerFloat("Smoothness", "Smoothness.", 0f, 1f, l => l.Smoothness, (l, v) => l.Smoothness = v));
             row.Add(ViewerFloat("Offset", "Normal Offset: pushes every group out of its blob along the blob normal, in metres.", 0f, 0.5f, l => l.NormalOffset, (l, v) => l.NormalOffset = v));
 
-            var size = new Vector2Field("Card size") { tooltip = "Card Size: width and height of every quad, in metres. Global to all blobs.", style = { minWidth = 220, marginRight = 8 } };
+            var size = new Vector2Field("Card size") { tooltip = "Card Size: width and height of every quad, in metres. Global to all blobs." };
+            size.AddToClassList("ff-vector");
+            size.labelElement.AddToClassList("ff-input-label");
             size.RegisterValueChangedCallback(e => EditLeaves("Edit Card Size", l => l.CardSize = e.newValue));
             _viewerSync.Add(() =>
             {
@@ -46,16 +47,18 @@ namespace Meowdieval.FoliageForge
             });
             row.Add(size);
 
-            row.Add(new Label("Leaf settings are global: every blob uses the same ones.") { style = { opacity = 0.65f, marginLeft = 4 } });
+            var note = new Label("Leaf settings are global: every blob uses the same ones.");
+            note.AddToClassList("ff-hint");
+            row.Add(note);
             PaintViewerControls();
             return row;
         }
 
         private SliderInt ViewerInt(string label, string tooltip, int min, int max, Func<LeafSettings, int> get, Action<LeafSettings, int> set)
         {
-            var s = new SliderInt(label, min, max) { tooltip = tooltip, showInputField = true, style = { width = 190, marginRight = 8 } };
-            s.labelElement.style.minWidth = 48;
-            s.labelElement.style.width = 48;
+            var s = new SliderInt(label, min, max) { tooltip = tooltip, showInputField = true };
+            s.AddToClassList("ff-slider");
+            s.labelElement.AddToClassList("ff-input-label");
             s.RegisterValueChangedCallback(e => EditLeaves("Edit " + label, l => set(l, e.newValue)));
             _viewerSync.Add(() =>
             {
@@ -66,9 +69,9 @@ namespace Meowdieval.FoliageForge
 
         private Slider ViewerFloat(string label, string tooltip, float min, float max, Func<LeafSettings, float> get, Action<LeafSettings, float> set)
         {
-            var s = new Slider(label, min, max) { tooltip = tooltip, showInputField = true, style = { width = 190, marginRight = 8 } };
-            s.labelElement.style.minWidth = 48;
-            s.labelElement.style.width = 48;
+            var s = new Slider(label, min, max) { tooltip = tooltip, showInputField = true };
+            s.AddToClassList("ff-slider");
+            s.labelElement.AddToClassList("ff-input-label");
             s.RegisterValueChangedCallback(e => EditLeaves("Edit " + label, l => set(l, e.newValue)));
             _viewerSync.Add(() =>
             {

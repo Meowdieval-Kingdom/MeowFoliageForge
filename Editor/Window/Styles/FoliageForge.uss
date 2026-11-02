@@ -1,0 +1,405 @@
+/* Foliage Forge shared styles. Variables live on .ff-root (added by FoliageUi.Apply).
+   Unity puts .unity-theme-dark / .unity-theme-light on the editor panel root, an ancestor of .ff-root.
+   USS has no gap/grid: spacing between siblings uses margins. */
+
+.ff-root {
+    --ff-accent: rgb(51, 102, 158);
+    --ff-accent-text: rgb(255, 255, 255);
+    --ff-panel: rgb(56, 56, 56);
+    --ff-panel-alt: rgb(64, 64, 64);
+    --ff-idle: rgb(77, 77, 77);
+    --ff-idle-hover: rgb(92, 92, 92);
+    --ff-idle-text: rgb(214, 214, 214);
+    --ff-text-muted: rgb(172, 172, 172);
+    --ff-ok: rgb(46, 125, 66);
+    --ff-warn: rgb(150, 98, 10);
+    --ff-bad: rgb(176, 58, 58);
+    --ff-neutral: rgb(70, 78, 90);
+    --ff-border: rgb(35, 35, 35);
+    --ff-amber: rgb(255, 191, 51);
+    --ff-picked: rgb(255, 255, 255);
+    --ff-thumb-bg: rgb(36, 41, 38);
+    --ff-gap: 6px;
+    --ff-pad: 8px;
+    --ff-radius: 4px;
+    --ff-font-body: 12px;
+    --ff-font-label: 12px;
+    --ff-font-small: 11px;
+    --ff-row-height: 24px;
+    --ff-button-primary-height: 30px;
+    --ff-label-min-width: 110px;
+    --ff-label-width: 40%;
+}
+
+.unity-theme-light .ff-root {
+    --ff-accent: rgb(38, 94, 158);
+    --ff-panel: rgb(214, 214, 214);
+    --ff-panel-alt: rgb(224, 224, 224);
+    --ff-idle: rgb(196, 196, 196);
+    --ff-idle-hover: rgb(180, 180, 180);
+    --ff-idle-text: rgb(32, 32, 32);
+    --ff-text-muted: rgb(78, 78, 78);
+    --ff-ok: rgb(30, 110, 50);
+    --ff-warn: rgb(150, 92, 0);
+    --ff-bad: rgb(168, 40, 40);
+    --ff-neutral: rgb(88, 98, 112);
+    --ff-border: rgb(150, 150, 150);
+    --ff-amber: rgb(125, 72, 0);
+    --ff-picked: rgb(20, 20, 20);
+}
+
+.ff-muted {
+    color: var(--ff-text-muted);
+    font-size: var(--ff-font-label);
+}
+
+.ff-hint {
+    color: var(--ff-text-muted);
+    font-size: var(--ff-font-small);
+    white-space: normal;
+    margin-top: 2px;
+    margin-bottom: 4px;
+}
+
+.ff-panel {
+    background-color: var(--ff-panel);
+    border-width: 1px;
+    border-color: var(--ff-border);
+    border-radius: var(--ff-radius);
+    padding: var(--ff-pad);
+    margin-bottom: var(--ff-gap);
+}
+
+.ff-group-label {
+    -unity-text-align: middle-left;
+    -unity-font-style: bold;
+    font-size: var(--ff-font-label);
+    color: var(--ff-text-muted);
+    margin-left: 4px;
+    margin-right: 4px;
+}
+
+/* flex-wrap row; children get margins since USS has no gap */
+.ff-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    min-height: var(--ff-row-height);
+}
+
+.ff-row > * {
+    margin-right: var(--ff-gap);
+    margin-bottom: 2px;
+}
+
+/* label column + growing control. Labels never shrink below 110px. */
+.ff-field {
+    flex-direction: row;
+    align-items: center;
+    min-height: var(--ff-row-height);
+    margin-bottom: 2px;
+}
+
+.ff-field > .ff-field__label {
+    width: var(--ff-label-width);
+    min-width: var(--ff-label-min-width);
+    flex-shrink: 0;
+    font-size: var(--ff-font-label);
+    -unity-text-align: middle-left;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+.ff-field > .ff-field__control {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 0;
+    min-width: 60px;
+}
+
+/* chip toggle / mode button */
+.ff-chip {
+    height: 28px;
+    min-width: 64px;
+    margin: 2px 4px 2px 0;
+    padding-left: 10px;
+    padding-right: 10px;
+    font-size: var(--ff-font-body);
+    -unity-font-style: bold;
+    border-radius: var(--ff-radius);
+    border-width: 0;
+    background-color: var(--ff-idle);
+    color: var(--ff-idle-text);
+}
+
+.ff-chip:hover {
+    background-color: var(--ff-idle-hover);
+}
+
+.ff-chip--on,
+.ff-chip--on:hover {
+    background-color: var(--ff-accent);
+    color: var(--ff-accent-text);
+}
+
+.ff-button {
+    height: var(--ff-row-height);
+    padding-left: 10px;
+    padding-right: 10px;
+    font-size: var(--ff-font-body);
+    border-radius: var(--ff-radius);
+}
+
+.ff-button--primary {
+    height: var(--ff-button-primary-height);
+    -unity-font-style: bold;
+    background-color: var(--ff-accent);
+    color: var(--ff-accent-text);
+}
+
+/* read-only stat pill: .ff-stat-chip__label + .ff-stat-chip__value children */
+.ff-stat-chip {
+    flex-direction: row;
+    align-items: center;
+    padding: 2px 8px;
+    margin-right: var(--ff-gap);
+    margin-bottom: 4px;
+    border-radius: 3px;
+    background-color: var(--ff-neutral);
+}
+
+.ff-stat-chip > Label {
+    color: rgb(255, 255, 255);
+    font-size: var(--ff-font-label);
+}
+
+.ff-stat-chip__label {
+    margin-right: 6px;
+    color: rgb(236, 236, 236);
+}
+
+.ff-stat-chip__value {
+    -unity-font-style: bold;
+}
+
+.ff-stat-chip--ok { background-color: var(--ff-ok); }
+.ff-stat-chip--warn { background-color: var(--ff-warn); }
+.ff-stat-chip--neutral { background-color: var(--ff-neutral); }
+
+/* ---- window chrome ---- */
+
+/* width breakpoints are applied from code (GeometryChangedEvent) as .ff-compact on the root */
+.ff-show-compact { display: none; }
+.ff-compact .ff-show-compact { display: flex; }
+.ff-compact .ff-hide-compact { display: none; }
+
+.ff-toolbar {
+    flex-shrink: 0;
+    background-color: var(--ff-panel-alt);
+    border-bottom-width: 1px;
+    border-color: var(--ff-border);
+    padding: 4px 6px 2px 6px;
+}
+
+/* recipe / profile picker group inside a toolbar row */
+.ff-toolbar__asset {
+    flex-direction: row;
+    align-items: center;
+    flex-grow: 1;
+    flex-basis: 260px;
+    min-width: 200px;
+}
+
+.ff-toolbar__asset > ObjectField {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 120px;
+    margin-right: var(--ff-gap);
+}
+
+.ff-toolbar__spacer { flex-grow: 1; }
+
+.ff-toolbar__group {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.ff-toolbar__group > * { margin-right: var(--ff-gap); }
+
+.ff-input-small { width: 56px; }
+
+/* bake button: a ToolbarButton, so it is restyled completely */
+.ff-bake {
+    height: var(--ff-button-primary-height);
+    min-width: 120px;
+    padding-left: 12px;
+    padding-right: 12px;
+    margin-left: 0;
+    margin-right: 0;
+    border-width: 0;
+    border-radius: var(--ff-radius);
+    font-size: var(--ff-font-body);
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    color: rgb(255, 255, 255);
+    background-color: var(--ff-neutral);
+}
+
+.ff-bake:hover, .ff-bake:active { color: rgb(255, 255, 255); }
+
+.ff-bake--create, .ff-bake--create:hover, .ff-bake--create:active { background-color: var(--ff-ok); }
+.ff-bake--overwrite, .ff-bake--overwrite:hover, .ff-bake--overwrite:active { background-color: var(--ff-warn); }
+.ff-bake--current, .ff-bake--current:hover, .ff-bake--current:active { background-color: var(--ff-neutral); }
+
+.ff-viewbar {
+    flex-shrink: 0;
+    background-color: var(--ff-panel-alt);
+    padding: 2px 8px;
+    min-height: 40px;
+}
+
+.ff-title {
+    -unity-font-style: bold;
+    font-size: var(--ff-font-body);
+    margin-right: 8px;
+}
+
+.ff-title--selected { color: var(--ff-amber); }
+
+.ff-divider {
+    border-top-width: 1px;
+    border-color: var(--ff-border);
+    margin-top: 4px;
+    padding-top: 4px;
+}
+
+.ff-row > .ff-hint { width: 100%; }
+
+/* sliders and vector fields: grow with the row, wrap when the row is narrow, labels never below 110px */
+.ff-slider {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 260px;
+    min-width: 220px;
+    margin-right: var(--ff-gap);
+}
+
+.ff-vector {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 320px;
+    min-width: 280px;
+    margin-right: var(--ff-gap);
+}
+
+.ff-input-label {
+    min-width: var(--ff-label-min-width);
+    width: var(--ff-label-min-width);
+    font-size: var(--ff-font-label);
+}
+
+/* right column: the preview keeps its height, everything else scrolls under it */
+.ff-right {
+    flex-grow: 1;
+    min-width: 320px;
+    overflow: hidden;
+}
+
+.ff-right--stacked {
+    min-width: 0;
+    min-height: 300px;
+}
+
+.ff-preview {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: 0;
+    min-height: 260px;
+}
+
+.ff-right-scroll {
+    flex-grow: 0;
+    flex-shrink: 1;
+    max-height: 55%;
+}
+
+.ff-side-content { padding: 0 8px; }
+
+.ff-stats {
+    padding-top: 4px;
+    padding-left: 0;
+}
+
+.ff-status {
+    white-space: normal;
+    font-size: var(--ff-font-body);
+    margin-bottom: 4px;
+}
+
+.ff-inspector { min-width: 260px; }
+.ff-inspector--stacked { min-width: 0; min-height: 140px; }
+
+/* gallery */
+.ff-gallery {
+    flex-shrink: 0;
+    background-color: var(--ff-panel);
+    border-top-width: 1px;
+    border-color: var(--ff-border);
+    padding: 4px 0 4px 0;
+    margin-top: 4px;
+}
+
+.ff-gallery__folder {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ff-gallery__tiles {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.ff-tile {
+    width: 104px;
+    margin: 0 6px 6px 0;
+    padding: 4px 0 2px 0;
+    align-items: center;
+    border-radius: var(--ff-radius);
+    border-width: 2px;
+    border-color: rgba(0, 0, 0, 0);
+    background-color: var(--ff-panel-alt);
+}
+
+.ff-tile--current { background-color: var(--ff-accent); }
+.ff-tile--picked { border-color: var(--ff-picked); }
+
+.ff-tile__name {
+    font-size: var(--ff-font-small);
+    margin-top: 2px;
+    max-width: 96px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ff-tile--current > .ff-tile__name { color: var(--ff-accent-text); }
+.ff-tile__name--picked { -unity-font-style: bold; }
+
+.ff-thumb {
+    width: 96px;
+    height: 96px;
+    background-color: var(--ff-thumb-bg);
+}
+
+.ff-gallery__tiles--small > .ff-tile { width: 72px; }
+.ff-gallery__tiles--small > .ff-tile > .ff-thumb { width: 64px; height: 64px; }
+.ff-gallery__tiles--small > .ff-tile > .ff-tile__name { max-width: 64px; }
+
+.ff-empty { margin: 16px 4px; white-space: normal; }

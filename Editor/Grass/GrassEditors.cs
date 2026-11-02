@@ -1,184 +1,91 @@
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace Meowdieval.FoliageForge
 {
-    /// <summary>
-    /// Grass profile inspector, also shown in the Foliage Forge window's Grass tab: look (biome, quality), grass types, grouped feature
-    /// switches, then the shared settings.
-    /// </summary>
-    [CustomEditor(typeof(GrassProfile))]
-    public sealed class GrassProfileEditor : Editor
-    {
-        const string AddTypesKey = "FoliageForge.Grass.AddTypes";
-
-        private static readonly (string title, string[] fields)[] FeatureGroups =
-        {
-            ("Motion", new[] { "Wind", "WindTexture", "Gusts", "Trample", "TrampleRT", "PerspectiveCorrection" }),
-            ("Colour", new[] { "Texture", "Gradient", "Variation", "Patches", "GroundBlend", "GroundMap", "TrailTint" }),
-            ("Lighting", new[] { "StylizedShading", "Rim", "Translucency", "ReceiveShadows", "CastShadows", "AdditionalLights", "LightRamp" }),
-            ("Performance", new[] { "DistanceFade", "DistanceLod", "AlphaToCoverage", "FrustumCulling", "MeshLod", "CpuThinning" }),
-        };
-
-        static readonly string[] Handled = { "m_Script", "Variants", "Features", "Biome" };
-
-        public override void OnInspectorGUI()
-        {
-            var profile = (GrassProfile)target;
-            DrawLook(profile);
-            serializedObject.Update();
-            DrawTypes();
-            DrawFeatures(profile);
-            DrawTriangles(profile);
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("Variants"), new GUIContent("Type details (texture, size, colour)"), true);
-            DrawRest();
-            serializedObject.ApplyModifiedProperties();
-        }
-
-        // biome and quality pick once, here; the window's Grass tab shows this same inspector
-        private static void DrawLook(GrassProfile profile)
-        {
-            EditorGUILayout.LabelField("Look", EditorStyles.boldLabel);
-            bool add = EditorPrefs.GetBool(AddTypesKey, false);
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                EditorGUILayout.LabelField($"Biome: {profile.Biome}", GUILayout.Width(130));
-                bool now = GUILayout.Toggle(add, new GUIContent("Add types only", "Off: a biome replaces the grass types, colours and wind feel. On: it only adds its grass types to the list and changes nothing else."));
-                if (now != add) EditorPrefs.SetBool(AddTypesKey, now);
-                add = now;
-            }
-            string[] biomes = System.Enum.GetNames(typeof(GrassBiome));
-            int biome = GUILayout.SelectionGrid(-1, biomes, 3);
-            if (biome >= 0)
-            {
-                Undo.RecordObject(profile, "Grass Biome");
-                GrassBiomes.Apply(profile, (GrassBiome)biome, add ? GrassApplyMode.AddTypes : GrassApplyMode.Replace);
-                EditorUtility.SetDirty(profile);
-            }
-            EditorGUILayout.LabelField("Quality tier: density, draw distance and the costly features in one click.", EditorStyles.miniLabel);
-            int q = GUILayout.SelectionGrid(-1, System.Enum.GetNames(typeof(GrassProfile.Quality)), 3);
-            if (q >= 0)
-            {
-                Undo.RecordObject(profile, "Grass Quality");
-                profile.ApplyQuality((GrassProfile.Quality)q);
-                EditorUtility.SetDirty(profile);
-            }
-            EditorGUILayout.Space(4);
-        }
-
-        // on/off, Mix % and Density per type, so the most used values are not buried in the Variants foldouts
-        private void DrawTypes()
-        {
-            EditorGUILayout.LabelField("Grass types", EditorStyles.boldLabel);
-            SerializedProperty types = serializedObject.FindProperty("Variants");
-            if (types.arraySize == 0)
-            {
-                EditorGUILayout.HelpBox("No grass types. Pick a Biome above, or press + under Type details.", MessageType.Warning);
-                return;
-            }
-            float labelWidth = EditorGUIUtility.labelWidth;
-            EditorGUIUtility.labelWidth = 50f;
-            for (int i = 0; i < types.arraySize; i++)
-            {
-                SerializedProperty v = types.GetArrayElementAtIndex(i);
-                SerializedProperty enabled = v.FindPropertyRelative("Enabled");
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    EditorGUILayout.PropertyField(enabled, new GUIContent(v.FindPropertyRelative("Name").stringValue, "Grow this type. Off keeps its settings but scatters none."), GUILayout.Width(140));
-                    using (new EditorGUI.DisabledScope(!enabled.boolValue))
-                    {
-                        EditorGUILayout.PropertyField(v.FindPropertyRelative("Mix"), new GUIContent("Mix %", "Share of this type's Density that grows where types combine. 100 = full density."));
-                        EditorGUILayout.PropertyField(v.FindPropertyRelative("Density"), new GUIContent("Density", "Clumps per square metre."), GUILayout.Width(110));
-                    }
-                }
-            }
-            EditorGUIUtility.labelWidth = labelWidth;
-            EditorGUILayout.Space(4);
-        }
-
-        private void DrawFeatures(GrassProfile profile)
-        {
-            SerializedProperty features = serializedObject.FindProperty("Features");
-            EditorGUILayout.LabelField($"Features ({profile.Features.EnabledCount()} on)", EditorStyles.boldLabel);
-            foreach ((string title, string[] fields) in FeatureGroups)
-            {
-                int on = 0;
-                foreach (string f in fields) if (features.FindPropertyRelative(f).boolValue) on++;
-                string key = "FoliageForge.Grass.Group." + title;
-                bool open = EditorGUILayout.Foldout(SessionState.GetBool(key, title != "Performance"), $"{title} ({on}/{fields.Length})", true);
-                SessionState.SetBool(key, open);
-                if (!open) continue;
-                EditorGUI.indentLevel++;
-                foreach (string f in fields) EditorGUILayout.PropertyField(features.FindPropertyRelative(f));
-                EditorGUI.indentLevel--;
-            }
-            if (profile.Features.LightRamp && profile.LightRamp == null)
-                EditorGUILayout.HelpBox("Light Ramp is on but no ramp texture is assigned (Light ramp section below); it stays off until one is.", MessageType.Info);
-            if (profile.Features.TrailTint && !profile.Features.TrampleRT)
-                EditorGUILayout.HelpBox("Trail Tint reads the trample map; switch on Trample Map too.", MessageType.Info);
-            EditorGUILayout.Space(4);
-        }
-
-        // triangles per clump at each mesh LOD, one line per enabled type
-        internal static void DrawTriangles(GrassProfile profile)
-        {
-            if (profile.Variants == null || profile.Variants.Length == 0) return;
-            var sb = new System.Text.StringBuilder("Triangles per clump (LOD 0 / 1 / 2)");
-            foreach (GrassVariant gv in profile.Variants)
-            {
-                if (!gv.Enabled) continue;
-                sb.Append($"\n{gv.Name}: {GrassMeshes.TriangleCount(gv, 0)} / {GrassMeshes.TriangleCount(gv, 1)} / {GrassMeshes.TriangleCount(gv, 2)}");
-            }
-            EditorGUILayout.HelpBox(sb.ToString(), MessageType.None);
-            EditorGUILayout.Space(4);
-        }
-
-        // Draw, Placement, Shading, Gusts, Patches and light
-        private void DrawRest()
-        {
-            SerializedProperty it = serializedObject.GetIterator();
-            for (bool enter = true; it.NextVisible(enter); enter = false)
-                if (System.Array.IndexOf(Handled, it.name) < 0) EditorGUILayout.PropertyField(it, true);
-        }
-    }
-
     /// <summary>Grass field inspector: rebuild button, live counts and a shortcut to the Foliage Brush.</summary>
     [CustomEditor(typeof(GrassField))]
     public sealed class GrassFieldEditor : Editor
     {
-        public override bool RequiresConstantRepaint() => true;
+        /// <summary>Default inspector as bound PropertyFields (m_Script read-only), for the field editors.</summary>
+        internal static void FillDefault(VisualElement root, SerializedObject so)
+        {
+            SerializedProperty it = so.GetIterator();
+            for (bool enter = true; it.NextVisible(enter); enter = false)
+            {
+                var pf = new PropertyField(it);
+                if (it.propertyPath == "m_Script") pf.SetEnabled(false);
+                root.Add(pf);
+            }
+        }
 
-        public override void OnInspectorGUI()
+        internal static Button FieldButton(string text, System.Action onClick)
+        {
+            var b = new Button(onClick) { text = text };
+            b.AddToClassList("ff-button");
+            b.style.marginTop = 2;
+            return b;
+        }
+
+        public override VisualElement CreateInspectorGUI()
         {
             var field = (GrassField)target;
-            DrawDefaultInspector();
-            EditorGUILayout.Space();
-            if (field.Profile == null)
-                EditorGUILayout.HelpBox("Assign a Grass Profile (Create > Meowdieval > Foliage Forge > Grass Profile).", MessageType.Warning);
-            else
-                EditorGUILayout.HelpBox(
-                    $"{field.InstanceCount:N0} clumps in {field.ChunkCount} chunks (scatter {field.LastRebuildMs:F0} ms)\n" +
-                    $"Last camera: {field.DrawnLastCamera:N0} clumps, {field.DrawCallsLastCamera} instanced calls", MessageType.None);
-            if (field.Profile != null) GrassProfileEditor.DrawTriangles(field.Profile);
-            if (GUILayout.Button("Rescatter")) field.Rebuild();
-            if (GUILayout.Button("Capture Ground Colour", GUILayout.Height(22))) CaptureGround(field);
+            var root = new VisualElement();
+            FoliageUi.Apply(root);
+            FillDefault(root, serializedObject);
 
-            EditorGUILayout.Space();
-            if (GUILayout.Button("Paint With Foliage Brush"))
+            var warn = new HelpBox("Assign a Grass Profile (Create > Meowdieval > Foliage Forge > Grass Profile).", HelpBoxMessageType.Warning);
+            var stats = new HelpBox("", HelpBoxMessageType.None);
+            var tris = new HelpBox("", HelpBoxMessageType.None);
+            warn.style.marginTop = 6;
+            stats.style.marginTop = 6;
+            root.Add(warn);
+            root.Add(stats);
+            root.Add(tris);
+
+            var rescatter = FieldButton("Rescatter", () => field.Rebuild());
+            rescatter.style.marginTop = 6;
+            root.Add(rescatter);
+            root.Add(FieldButton("Capture Ground Colour", () => CaptureGround(field)));
+
+            var paint = FieldButton("Paint With Foliage Brush", () =>
             {
                 Selection.activeGameObject = field.gameObject;
                 FoliageBrush.Target = BrushTarget.Grass;
                 FoliageBrush.Save();
                 FoliageBrush.Open();
-            }
-            using (new EditorGUI.DisabledScope(field.StrokeCount == 0))
-                if (GUILayout.Button($"Clear Paint ({field.StrokeCount} strokes)") && EditorUtility.DisplayDialog("Clear grass paint", "Remove every brush stroke?", "Clear", "Cancel"))
-                {
-                    Undo.RecordObject(field, "Clear Grass Paint");
-                    field.ClearStrokes();
-                    EditorUtility.SetDirty(field);
-                    PrefabUtility.RecordPrefabInstancePropertyModifications(field);
-                }
+            });
+            paint.style.marginTop = 10;
+            root.Add(paint);
+            var clear = FieldButton("Clear Paint", () =>
+            {
+                if (!EditorUtility.DisplayDialog("Clear grass paint", "Remove every brush stroke?", "Clear", "Cancel")) return;
+                Undo.RecordObject(field, "Clear Grass Paint");
+                field.ClearStrokes();
+                EditorUtility.SetDirty(field);
+                PrefabUtility.RecordPrefabInstancePropertyModifications(field);
+            });
+            root.Add(clear);
+
+            // live counts (the IMGUI version repainted constantly)
+            root.schedule.Execute(() =>
+            {
+                if (field == null) return;
+                bool has = field.Profile != null;
+                warn.style.display = has ? DisplayStyle.None : DisplayStyle.Flex;
+                stats.style.display = has ? DisplayStyle.Flex : DisplayStyle.None;
+                if (has)
+                    stats.text = $"{field.InstanceCount:N0} clumps in {field.ChunkCount} chunks (scatter {field.LastRebuildMs:F0} ms)\n" +
+                                 $"Last camera: {field.DrawnLastCamera:N0} clumps, {field.DrawCallsLastCamera} instanced calls";
+                string tri = has ? GrassProfileEditor.TriangleText(field.Profile) : null;
+                tris.style.display = tri != null ? DisplayStyle.Flex : DisplayStyle.None;
+                if (tri != null) tris.text = tri;
+                clear.text = $"Clear Paint ({field.StrokeCount} strokes)";
+                clear.SetEnabled(field.StrokeCount != 0);
+            }).Every(250);
+            return root;
         }
 
         // top-down render of the ground layers over the box, saved as a texture the shader tints the grass with
