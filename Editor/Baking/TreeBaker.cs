@@ -163,6 +163,7 @@ namespace Meowdieval.FoliageForge
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
             Object.DestroyImmediate(root);
+            PrefabThumbnail.Save(prefabPath, mesh, MaterialSlots(recipe));
             return prefab;
         }
 

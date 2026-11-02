@@ -108,6 +108,7 @@ namespace Meowdieval.FoliageForge
             batch.Variant = v;
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, $"{folder}/{name}.prefab");
             Object.DestroyImmediate(go);
+            PrefabThumbnail.Save($"{folder}/{name}.prefab", mesh, new[] { mat });
             return prefab;
         }
 
