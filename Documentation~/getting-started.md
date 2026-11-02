@@ -10,12 +10,15 @@
 
 ## First tree
 
-1. Press **New** and pick a preset: Oak, Dead, Maple or Spruce. The **Textured** toggle next to the Preset menu decides whether the preset loads leaf, bark and moss textures (off: flat solid cards). **Swap Textures** switches the current recipe between both without resetting anything else.
-2. Edit the settings on the left. The tree rebuilds as you edit.
-3. Navigate the preview: drag to orbit, scroll to zoom, double-click to reset.
-4. **Bake Prefab** writes `<recipe name>/` (mesh, bark material, leaf material, prefab, LOD meshes) into the output folder. Default is `Assets/Foliage Forge`; change it with **Folder...** under the preview.
+1. Press **Preset** (second toolbar row, or **More** in a narrow window) and pick Oak, Dead, Maple or Spruce. The **Textured** chip next to it decides whether a preset loads leaf, bark and moss textures (off: flat solid cards). **Swap Textures** switches the current recipe between both without resetting anything else.
+2. Edit the settings on the left. Pick a tab (**Shape**, **Foliage**, **Look**, **Output**), or type in the search field to find a setting by name. **Advanced** on a section reveals its rarely used settings. The tree rebuilds as you edit.
+3. Navigate the preview: drag to orbit, scroll to zoom, double-click to reset. The View bar above it switches between Render, Wireframe and the other modes.
+4. **Bake Prefab** writes `<recipe name>/` (mesh, bark material, leaf material, prefab, LOD meshes) into the output folder. Default is `Assets/Foliage Forge`; change it with **Folder...** in the Prefabs gallery below the preview. With no recipe picked, Bake first asks where to save the scratch tree.
+5. The baked prefab appears in the gallery. Double-click a tile to open its recipe again.
 
 ![Oak preset](images/preset-oak.png)
+
+Every control in the window, the responsive layout and the preview shortcuts are listed in [The Foliage Forge window](window.md).
 
 ## Window tour
 

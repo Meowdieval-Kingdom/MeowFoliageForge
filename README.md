@@ -17,6 +17,7 @@ Procedural stylized foliage for Unity (URP). Design a tree as a **recipe** (seed
 - **Variants and LODs**: bake sets of seed variants, automatic `LODGroup` with cross fade.
 - **GPU grass**: instanced clumps with wind, trample, ground-colour tint, distance LOD and a biome system.
 - **Foliage Brush**: paint trees, grass and any prefab into the scene with weighted palettes.
+- **Searchable settings**: tabs, a search field and per-section **Advanced** toggles keep the editors short.
 - **Setup Wizard**: checks the URP asset, layers and shaders and fixes them in one click.
 
 ## Requirements
@@ -45,8 +46,8 @@ After import the **Setup Wizard** opens once. Apply the *Required* fixes, then y
 ## Quick start
 
 1. `Meowdieval > Foliage Forge > Foliage Forge Editor`.
-2. Press **New**, pick a preset (Oak, Maple, Spruce, Dead).
-3. Edit settings on the left; the preview rebuilds as you type. Drag to orbit, scroll to zoom, double-click to reset.
+2. Pick a **Preset** (Oak, Maple, Spruce, Dead) in the toolbar's second row, or under **More** in a narrow window.
+3. Edit settings on the left (tabs, search, **Advanced**); the preview rebuilds as you type. Drag to orbit, scroll to zoom, double-click to reset.
 4. **Bake Prefab** writes `Assets/Foliage Forge/<recipe name>/` (mesh, bark and leaf materials, prefab).
 5. `GameObject > Meowdieval > Foliage Forge` adds a manager; open the **Foliage Brush** and paint.
 6. Add one **Foliage Wind** component to the scene so everything sways.
@@ -57,7 +58,8 @@ Full walkthrough: [Getting started](Documentation~/getting-started.md).
 
 | Page | Covers |
 |---|---|
-| [Getting started](Documentation~/getting-started.md) | Window tour, first tree, baking, wind |
+| [Getting started](Documentation~/getting-started.md) | First tree, baking, wind, placing it in a scene |
+| [The window](Documentation~/window.md) | Toolbar, settings pane, preview modes and controls, gallery, responsive layout |
 | [Trees](Documentation~/trees.md) | Trunk, branches, roots, crown shape, blobs, fronds, budgets |
 | [Leaves, look and shaders](Documentation~/look-and-shaders.md) | Cards, textures, gradient, stylized shading, translucency, mesh layout, wind |
 | [Variants and LODs](Documentation~/variants-and-lods.md) | Type Id, seed variants, variant sets, LOD meshes |
@@ -90,6 +92,6 @@ Full walkthrough: [Getting started](Documentation~/getting-started.md).
 
 Editor tests live in `Tests/Editor` (generator, recipe editor, variants, brush, grass scatter and math, setup). Run them from the Test Runner, *EditMode*.
 
-## Screenshots
+## Images
 
-The images here are renders of baked presets made with the package's own materials. Screenshots of the editor window itself are not included yet.
+The images here are renders of baked presets made with the package's own materials. The editor window is described in [The window](Documentation~/window.md).
